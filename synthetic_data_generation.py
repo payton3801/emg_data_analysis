@@ -84,12 +84,23 @@ ax.set_xlim([0, 200])
 
 
 # %% 
-# now test changing the number of points in the FFT in the same way 
+#Just like we set up a code cell that looped through different values of N overlap and kept constant NFFT, 
+#setup another cell that instead fixes NOVERLAP and loops over different values of NFFT
+NOVERLAP = 500 
+NFFTS = [1000, 2000, 10000] #whyy does the first value have to be over 1000?
+
+fig = plt.figure(figsize=(5,5), dpi = 300)
+ax = fig.add_subplot(111)
+
+for current_NFFT in NFFTS:
+    current_NPERSEG = current_NFFT
+    f, pxx = signal.welch(sinewave, nperseg= current_NPERSEG, nfft= current_NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
+    ax.loglog(f, pxx, '-o', alpha=0.4)
 
 
 # %%
 #Adding spikes to signify powerline harmonics
-num_harmonics = int(input("Enter the number of harmonics: "))
+#num_harmonics = int(input("Enter the number of harmonics: "))
 
 #spiketimes = [2 * i for i in range(1, num_harmonics+1)]
 #spike_index = np.isin(time, spiketimes) 
