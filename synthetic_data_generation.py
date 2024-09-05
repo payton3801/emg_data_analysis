@@ -23,11 +23,11 @@ def sine_wave_generator(duration_s, sample_rate, freq, amp=1, phase=0, n_harmoni
     """
     # generate the time vector
     t = np.arange(0, duration_s, 1/sample_rate)  #gives us the sample rate number of points in duration_s seconds
-    x = amp * np.sin((2*np.pi * freq * t) + phase) #sine formula
+    x = (amp/(n_harmonics+1)) * np.sin((2*np.pi * freq * t) + phase) #sine formula
     if n_harmonics > 0:
         for i in range(n_harmonics):
             # create harmonic of fundamental frequency
-            x_har = amp * np.sin((2*np.pi * freq*(i+2) * t) + phase) #i+2 because we want the first harmonic to be 2*freq
+            x_har = (amp/(n_harmonics+1)) * np.sin((2*np.pi * freq*(i+2) * t) + phase) #i+2 because we want the first harmonic to be 2*freq
             # add harmonic to signal
             x = x + x_har
     return t, x
@@ -48,7 +48,12 @@ if N_HAR > 0:
     for i in range(N_HAR):
         true_frequencies.append(FREQUENCY*(i+2))
 
-plt.plot(t, sinewave, 'k') #plots time vs sinewave
+fig = plt.figure(figsize=(10,4), dpi=200)
+ax = fig.add_subplot(111)
+ax.plot(t, sinewave, 'k') #plots time vs sinewave
+
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
 
 plt.xlim([0,1])
 
@@ -59,39 +64,59 @@ plt.xlim([0,1])
 NFFT = 5000 #fs/nfft is the frequency resolution, FFT computed to this number of points
 NPERSEG = NFFT #each segment has the same length as number of points in FFT
 NOVERLAP = 500 #points of overlap, must be less than NPERSEG
-N_OVERLAPS = [0, 500, 1000] #different overlap values to test
+NOVERLAPS = [0, 500, 1000, 2000, 4999] #different overlap values to test
+fontsize = 8
+fig, axs = plt.subplots(len(NOVERLAPS), 1, figsize=(5,7), dpi=300)
+#fig = plt.figure(figsize=(5,5), dpi=300) #dpi is the resolution
+#ax = fig.add_subplot(111) # grid with 1 row, 1 column, and this subplot being the only
 
-fig = plt.figure(figsize=(5,5), dpi=300) #dpi is the resolution
-ax = fig.add_subplot(111) # grid with 1 row, 1 column, and this subplot being the only
-
-for N_OVERLAP in N_OVERLAPS:
+for i, current_NOVERLAP in enumerate(NOVERLAPS):    
     #signal.welch computes the power spectral density of the input signal
-    f, pxx = signal.welch(sinewave, nfft=NFFT, noverlap=N_OVERLAP, nperseg=NPERSEG, fs=SAMPLE_RATE) #f=array of sample frequencies, pxx=power spectral density of signal
+    f, pxx = signal.welch(sinewave, nfft=NFFT, noverlap=current_NOVERLAP, nperseg=NPERSEG, fs=SAMPLE_RATE) #f=array of sample frequencies, pxx=power spectral density of signal
     # plot frequency spectra in log-log
-    ax.loglog(f, pxx, '-o', alpha=0.4) #log scale for both x and y axes, alpha is the transparency of the line
-    
-
-for true_freq in true_frequencies:
-    ax.axvline(x=true_freq, color='r', linestyle='--') #plotting vertical lines at the true frequencies
-
-# make plot prettier
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-
-ax.set_xlabel("Frequency (Hz)")
-ax.set_ylabel("Power")
-ax.set_xlim([0, 200])
-
-
+    axs[i].semilogy(f, pxx, '-o', alpha=0.4, color='k', markersize=2) #log scale for both x and y axes, alpha is the transparency of the line
+    # make plot prettier
+    axs[i].spines["top"].set_visible(False)
+    axs[i].spines["right"].set_visible(False)    
+    axs[i].set_ylabel("Power", fontsize=fontsize)
+    axs[i].set_xlim([0, 125])
+    axs[i].set_title(f"NFFT: {NFFT}, NOLAP: {current_NOVERLAP}", fontsize=fontsize)
+    for true_freq in true_frequencies:
+        axs[i].axvline(x=true_freq, color='k', linestyle='--', alpha=0.4) #plotting vertical lines at the true frequencies    
+    if i == len(NOVERLAPS)-1:
+        axs[i].set_xlabel("Frequency (Hz)", fontsize=fontsize)
+fig.tight_layout()
 # %% 
-# now test changing the number of points in the FFT in the same way 
+#Just like we set up a code cell that looped through different values of N overlap and kept constant NFFT, 
+#setup another cell that instead fixes NOVERLAP and loops over different values of NFFT
+NOVERLAP = 500 
+#whyy does the first value have to be over 1000? <- LW: I don't think it has to be see below. It has to satisfy NFFT > NOVERLAP
+NFFTS = [900, 1000, 2000, 10000] 
 
+fig, axs = plt.subplots(len(NFFTS), 1, figsize=(5,5), dpi=300)
+#ax = fig.add_subplot(111)
 
+for i, current_NFFT in enumerate(NFFTS):
+    current_NPERSEG = current_NFFT
+    f, pxx = signal.welch(sinewave, nperseg= current_NPERSEG, nfft= current_NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
+    axs[i].semilogy(f, pxx, '-o', color='k', markersize=2, alpha=0.4)
+    # make plot prettier
+    axs[i].spines["top"].set_visible(False)
+    axs[i].spines["right"].set_visible(False)
+    axs[i].set_xlabel("Frequency (Hz)")
+    axs[i].set_ylabel("Power")
+    axs[i].set_xlim([0, 125])
+    axs[i].set_title(f"NFFT: {current_NFFT}, NOLAP: {NOVERLAP}")
+    for true_freq in true_frequencies:
+        axs[i].axvline(x=true_freq, color='k', linestyle='--', alpha=0.4) #plotting vertical lines at the true frequencies            
+
+fig.tight_layout()
 # %%
-#Adding spikes to signify powerline harmonics
-num_harmonics = int(input("Enter the number of harmonics: "))
+# now that we better understand how to use frequency estimation tools
 
-#spiketimes = [2 * i for i in range(1, num_harmonics+1)]
-#spike_index = np.isin(time, spiketimes) 
-#abs_sinewave[spike_index] += np.random.uniform(3,5)
+# lets try to simulate a signal with powerline noise.
+
+# create a signal that has powerline noise at 60Hz and at 6 harmonics (120, 180, 240, ...)
+# plot 1: plot the signal
+# plot 2: compute the FFT using appropriate parameters for the power spectral density estimate (using signal.welch) and plot the spectra
 
