@@ -134,8 +134,8 @@ ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
 ax1.set_xlim([0,1])
 ax1.set_ylabel("Power")
-ax2.set_xlabel("Time (s)")
-ax2.set_title("Time Domain")
+ax1.set_xlabel("Time (s)")
+ax1.set_title("Time Domain")
 # plot 2: compute the FFT using appropriate parameters for the power spectral density estimate (using signal.welch) and plot the spectra
 #Use sampling rate/NFFT = frequency resolution (0.1) to find ideal NFFT value
 #Use .2 (NFFT) = NOVERLAP
@@ -147,6 +147,6 @@ ax2.spines["right"].set_visible(False)
 ax2.set_ylabel("Power")
 ax2.set_xlabel("Frequency (Hz)")
 ax2.set_xlim([0,370])
-ax2.set_title("Frequency Spectrum")
+ax2.set_title("Frequency Domain")
 fig.tight_layout()
 # %%
