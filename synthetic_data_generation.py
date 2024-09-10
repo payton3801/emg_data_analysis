@@ -122,14 +122,13 @@ fig.tight_layout()
 
 # create a signal that has powerline noise at 60Hz and at 6 harmonics (120, 180, 240, ...)
 # plot 1: plot the signal
-t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, n_harmonics=N_HAR) 
 FREQUENCY = 60
 SAMPLE_RATE = 2000
 DURATION_S = 10
 N_HAR = 6
+t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, n_harmonics=N_HAR) 
 
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10,4), dpi=200)
-
 ax1.plot(t, sinewave, 'k')
 ax1.spines['top'].set_visible(False)
 ax1.spines['right'].set_visible(False)
