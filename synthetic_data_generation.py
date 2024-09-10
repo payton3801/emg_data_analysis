@@ -140,7 +140,11 @@ ax1.set_title("Time Domain")
 #Use sampling rate/NFFT = frequency resolution (0.1) to find ideal NFFT value
 #Use .2 (NFFT) = NOVERLAP
 
-f, pxx = signal.welch(sinewave, nperseg = 20000, nfft = 20000, noverlap = 4000, fs = SAMPLE_RATE)
+NFFT = 20000
+NPERSEG = 20000
+NOVERLAP = 4000
+
+f, pxx = signal.welch(sinewave, nperseg = NPERSEG, nfft = NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
 ax2.semilogy(f, pxx, '-o',color = 'k', markersize = 2, alpha = 0.4)
 ax2.spines["top"].set_visible(False)
 ax2.spines["right"].set_visible(False)
