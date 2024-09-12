@@ -58,7 +58,7 @@ ax.spines['right'].set_visible(False)
 plt.xlim([0,1])
 
 # %%
-# what does this look like in frequency space?
+# transferring this to the frequency subspace
 
 # compute the power spectra using the welch medthod
 NFFT = 5000 #fs/nfft is the frequency resolution, FFT computed to this number of points
@@ -86,6 +86,8 @@ for i, current_NOVERLAP in enumerate(NOVERLAPS):
     if i == len(NOVERLAPS)-1:
         axs[i].set_xlabel("Frequency (Hz)", fontsize=fontsize)
 fig.tight_layout()
+
+
 # %% 
 #Just like we set up a code cell that looped through different values of N overlap and kept constant NFFT, 
 #setup another cell that instead fixes NOVERLAP and loops over different values of NFFT
@@ -111,6 +113,8 @@ for i, current_NFFT in enumerate(NFFTS):
         axs[i].axvline(x=true_freq, color='k', linestyle='--', alpha=0.4) #plotting vertical lines at the true frequencies            
 
 fig.tight_layout()
+
+
 # %%
 # now that we better understand how to use frequency estimation tools
 
@@ -118,5 +122,35 @@ fig.tight_layout()
 
 # create a signal that has powerline noise at 60Hz and at 6 harmonics (120, 180, 240, ...)
 # plot 1: plot the signal
-# plot 2: compute the FFT using appropriate parameters for the power spectral density estimate (using signal.welch) and plot the spectra
+FREQUENCY = 60
+SAMPLE_RATE = 2000
+DURATION_S = 10
+N_HAR = 6
+t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, n_harmonics=N_HAR) 
 
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10,4), dpi=200)
+ax1.plot(t, sinewave, 'k')
+ax1.spines['top'].set_visible(False)
+ax1.spines['right'].set_visible(False)
+ax1.set_xlim([0,1])
+ax1.set_ylabel("Power")
+ax1.set_xlabel("Time (s)")
+ax1.set_title("Time Domain")
+# plot 2: compute the FFT using appropriate parameters for the power spectral density estimate (using signal.welch) and plot the spectra
+#Use sampling rate/NFFT = frequency resolution (0.1) to find ideal NFFT value
+#Use .2 (NFFT) = NOVERLAP
+
+NFFT = 20000
+NPERSEG = 20000
+NOVERLAP = 4000
+
+f, pxx = signal.welch(sinewave, nperseg = NPERSEG, nfft = NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
+ax2.semilogy(f, pxx, '-o',color = 'k', markersize = 2, alpha = 0.4)
+ax2.spines["top"].set_visible(False)
+ax2.spines["right"].set_visible(False)
+ax2.set_ylabel("Power")
+ax2.set_xlabel("Frequency (Hz)")
+ax2.set_xlim([0,370])
+ax2.set_title("Frequency Domain")
+fig.tight_layout()
+# %%
