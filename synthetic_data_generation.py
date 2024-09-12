@@ -35,8 +35,14 @@ def sine_wave_generator(duration_s, sample_rate, freq, amp=1, phase=0, n_harmoni
 def spike_generator(x):
     pass
 
-def noise_generator(x):
-    pass
+def noise_generator(noise_mean=0, noise_std=1):
+    # TODO: create random Gaussian noise and add it to the signal x
+    # TODO: noise is parameterized by `noise_mean` and `noise_std`
+    # HINT: use numpy's `random.randn` to generate a sequence of random samples from a normal distribution of length `x`
+    # HINT: to change the mean of the distribution, what operation (e.g., addition, subtraction, division, multiplication) should be use to incorporate `noise_mean`
+    # HINT: to change the std of the distribution, what operation should we use to incorporate `noise_std`
+    noise = None
+    return noise
 
 t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, amp=AMPLITUDE, phase=PHASE, n_harmonics=N_HAR) #storing time vector and sinewave signal  
 
@@ -153,4 +159,25 @@ ax2.set_xlabel("Frequency (Hz)")
 ax2.set_xlim([0,370])
 ax2.set_title("Frequency Domain")
 fig.tight_layout()
-# %%
+# %% - plot noise distributions with different parameters 
+
+# noise_mean = 0, noise_std = 1
+# -- generate the noise distribution
+# noise_0 = noise_generator(noise_mean=0, noise_std=1)
+# -- plot the distribution, HINT: use plt.hist. Adjust resolution of histogram by modifying kwarg 'bins'
+
+# noise_mean = 2, noise_std = 1
+# noise_1 = ...
+# noise_mean = 0, noise_std = 4
+
+# noise_mean = -2, noise_std = 0.25
+
+# %% -- add noise to sinewave compare frequency spectra between noisy sinewave vs clean sinewave
+
+# noise = noise_0
+
+#noisy_sinewave = sinewave + noise
+
+# set your frequenecy estimation parameters 
+
+# plot overlaid spectra 
