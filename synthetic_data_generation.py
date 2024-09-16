@@ -20,6 +20,7 @@ def sine_wave_generator(duration_s, sample_rate, freq, amp=1, phase=0, n_harmoni
         sample_rate: (Hz) sampling frequency
         freq: (Hz) fundamental frequency of sine wave
         phase: (radians) phase shift of the sine wave
+        n_harmonics: number of harmonics to add to the sine wave
     """
     # generate the time vector
     t = np.arange(0, duration_s, 1/sample_rate)  #gives us the sample rate number of points in duration_s seconds
@@ -30,19 +31,24 @@ def sine_wave_generator(duration_s, sample_rate, freq, amp=1, phase=0, n_harmoni
             x_har = (amp/(n_harmonics+1)) * np.sin((2*np.pi * freq*(i+2) * t) + phase) #i+2 because we want the first harmonic to be 2*freq
             # add harmonic to signal
             x = x + x_har
-    return t, x
+    return t, x 
 
 def spike_generator(x):
     pass
 
-def noise_generator(noise_mean=0, noise_std=1):
+def noise_generator(x=sinewave, noise_mean=0, noise_std=1):
+    """ generates randomized Gaussian noise with specified mean and standard deviation
+    
+        noise_mean = mean of Gaussian distribution
+        noise_std = standard deviation of Gaussian distribution
+    """
     # TODO: create random Gaussian noise and add it to the signal x
     # TODO: noise is parameterized by `noise_mean` and `noise_std`
     # HINT: use numpy's `random.randn` to generate a sequence of random samples from a normal distribution of length `x`
     # HINT: to change the mean of the distribution, what operation (e.g., addition, subtraction, division, multiplication) should be use to incorporate `noise_mean`
     # HINT: to change the std of the distribution, what operation should we use to incorporate `noise_std`
-    noise = None
-    return noise
+    noise = noise_mean + noise_std * np.random.randn(len(x))
+    return noise 
 
 t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, amp=AMPLITUDE, phase=PHASE, n_harmonics=N_HAR) #storing time vector and sinewave signal  
 
@@ -66,7 +72,7 @@ plt.xlim([0,1])
 # %%
 # transferring this to the frequency subspace
 
-# compute the power spectra using the welch medthod
+# compute the power spectra using the welch method
 NFFT = 5000 #fs/nfft is the frequency resolution, FFT computed to this number of points
 NPERSEG = NFFT #each segment has the same length as number of points in FFT
 NOVERLAP = 500 #points of overlap, must be less than NPERSEG
@@ -98,7 +104,6 @@ fig.tight_layout()
 #Just like we set up a code cell that looped through different values of N overlap and kept constant NFFT, 
 #setup another cell that instead fixes NOVERLAP and loops over different values of NFFT
 NOVERLAP = 500 
-#whyy does the first value have to be over 1000? <- LW: I don't think it has to be see below. It has to satisfy NFFT > NOVERLAP
 NFFTS = [900, 1000, 2000, 10000] 
 
 fig, axs = plt.subplots(len(NFFTS), 1, figsize=(5,5), dpi=300)
@@ -120,13 +125,9 @@ for i, current_NFFT in enumerate(NFFTS):
 
 fig.tight_layout()
 
-
-# %%
-# now that we better understand how to use frequency estimation tools
-
-# lets try to simulate a signal with powerline noise.
-
+# %% 
 # create a signal that has powerline noise at 60Hz and at 6 harmonics (120, 180, 240, ...)
+
 # plot 1: plot the signal
 FREQUENCY = 60
 SAMPLE_RATE = 2000
@@ -159,25 +160,58 @@ ax2.set_xlabel("Frequency (Hz)")
 ax2.set_xlim([0,370])
 ax2.set_title("Frequency Domain")
 fig.tight_layout()
-# %% - plot noise distributions with different parameters 
+
+# %% - plot noise distributions with changing parameters
 
 # noise_mean = 0, noise_std = 1
-# -- generate the noise distribution
-# noise_0 = noise_generator(noise_mean=0, noise_std=1)
+noise_0 = noise_generator()
+plt.hist(noise_0, bins=50, color='m', alpha=0.4)
 # -- plot the distribution, HINT: use plt.hist. Adjust resolution of histogram by modifying kwarg 'bins'
 
 # noise_mean = 2, noise_std = 1
-# noise_1 = ...
+NOISE_MEAN = 2
+noise_1 = noise_generator(noise_mean = NOISE_MEAN)
+plt.hist(noise_1, bins=50, color='c', alpha=0.4)
 # noise_mean = 0, noise_std = 4
 
 # noise_mean = -2, noise_std = 0.25
+NOISE_MEAN = -2
+NOISE_STD = 0.25
+noise_2 = noise_generator(noise_mean = NOISE_MEAN, noise_std = NOISE_STD)
+plt.hist(noise_2, bins=50, color='g', alpha=0.4)
 
-# %% -- add noise to sinewave compare frequency spectra between noisy sinewave vs clean sinewave
+# %% -- PLotting power vs frequency spectra of clean and noisy sinewaves
 
-# noise = noise_0
+#adding noise to sinewave
+noisy_sinewave_0 = sinewave + noise_0
+noisy_sinewave_1 = sinewave + noise_1
+noisy_sinewave_2 = sinewave + noise_2
 
-#noisy_sinewave = sinewave + noise
+#defining parameters
+NFFT = 20000
+NPERSEG = 20000
+NOVERLAP = 4000
+SAMPLE_RATE = 2000
 
-# set your frequenecy estimation parameters 
+#computing power spectral density of the clean and noisy sinewaves
+f, pxx = signal.welch(sinewave, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noise_0 = signal.welch(noisy_sinewave_0, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noise_1 = signal.welch(noisy_sinewave_1, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noise_2 = signal.welch(noisy_sinewave_2, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 
-# plot overlaid spectra 
+#plotting the original and noisy plots on top of each otherplt.figure(figsize=(10,4), dpi=200)
+plt.figure(figsize=(10, 4), dpi=200)
+plt.semilogy(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='Clean Sinewave')
+plt.semilogy(f, pxx_noise_0, '-o', alpha=0.4, color='m', markersize=2, label='Noisy Sinewave 0')
+plt.semilogy(f, pxx_noise_1, '-o', alpha=0.4, color='c', markersize=2, label='Noisy Sinewave 1')
+plt.semilogy(f, pxx_noise_2, '-o', alpha=0.4, color='g', markersize=2, label='Noisy Sinewave 2')
+
+#plot details
+plt.xlim([0, 370])
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Power")
+plt.title("Overlaid Spectra of Clean and Noisy Sinewave")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
