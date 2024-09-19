@@ -51,7 +51,7 @@ def noise_generator(x=sinewave, noise_mean=0, noise_std=1):
     return noise 
 
 t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, amp=AMPLITUDE, phase=PHASE, n_harmonics=N_HAR) #storing time vector and sinewave signal  
-
+scaled_sinewave = sinewave * 10
 true_frequencies = []
 
 # add the fundamental frequency
@@ -134,7 +134,7 @@ SAMPLE_RATE = 2000
 DURATION_S = 10
 N_HAR = 6
 t, sinewave = sine_wave_generator(DURATION_S, SAMPLE_RATE, FREQUENCY, n_harmonics=N_HAR) 
-
+scaled_sinewave = sinewave *  1
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10,4), dpi=200)
 ax1.plot(t, sinewave, 'k')
 ax1.spines['top'].set_visible(False)
@@ -165,27 +165,28 @@ fig.tight_layout()
 
 # noise_mean = 0, noise_std = 1
 noise_0 = noise_generator()
-plt.hist(noise_0, bins=50, color='m', alpha=0.4)
+plt.hist(noise_0, bins=100, color='m', alpha=0.4)
 # -- plot the distribution, HINT: use plt.hist. Adjust resolution of histogram by modifying kwarg 'bins'
 
 # noise_mean = 2, noise_std = 1
-NOISE_MEAN = 2
-noise_1 = noise_generator(noise_mean = NOISE_MEAN)
-plt.hist(noise_1, bins=50, color='c', alpha=0.4)
+NOISE_MEAN = 10
+NOISE_STD = 30
+noise_1 = noise_generator(noise_mean = NOISE_MEAN, noise_std = NOISE_STD)
+plt.hist(noise_1, bins=100, color='c', alpha=0.4)
 # noise_mean = 0, noise_std = 4
 
 # noise_mean = -2, noise_std = 0.25
-NOISE_MEAN = -2
-NOISE_STD = 0.25
+NOISE_MEAN = -5
+NOISE_STD = 0.1
 noise_2 = noise_generator(noise_mean = NOISE_MEAN, noise_std = NOISE_STD)
-plt.hist(noise_2, bins=50, color='g', alpha=0.4)
+plt.hist(noise_2, bins=100, color='g', alpha=0.4)
 
 # %% -- PLotting power vs frequency spectra of clean and noisy sinewaves
 
 #adding noise to sinewave
-noisy_sinewave_0 = sinewave + noise_0
-noisy_sinewave_1 = sinewave + noise_1
-noisy_sinewave_2 = sinewave + noise_2
+noisy_sinewave_0 = scaled_sinewave + noise_0 #*0.00000000000001 #added scaling factor to bring noise to same scale as sinewave
+noisy_sinewave_1 = scaled_sinewave + noise_1 #*0.00000000000001
+noisy_sinewave_2 = scaled_sinewave + noise_2 #*0.00000000000001
 
 #defining parameters
 NFFT = 20000
@@ -194,17 +195,21 @@ NOVERLAP = 4000
 SAMPLE_RATE = 2000
 
 #computing power spectral density of the clean and noisy sinewaves
-f, pxx = signal.welch(sinewave, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-f, pxx_noise_0 = signal.welch(noisy_sinewave_0, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-f, pxx_noise_1 = signal.welch(noisy_sinewave_1, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-f, pxx_noise_2 = signal.welch(noisy_sinewave_2, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx = signal.welch(scaled_sinewave, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noisy_sinewave_0 = signal.welch(noisy_sinewave_0, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noisy_sinewave_1 = signal.welch(noisy_sinewave_1, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noisy_sinewave_2 = signal.welch(noisy_sinewave_2, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 
+f, pxx_noise_0 = signal.welch(noise_0, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noise_1 = signal.welch(noise_1, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx_noise_2 = signal.welch(noise_2, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 #plotting the original and noisy plots on top of each otherplt.figure(figsize=(10,4), dpi=200)
 plt.figure(figsize=(10, 4), dpi=200)
+
 plt.semilogy(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='Clean Sinewave')
-plt.semilogy(f, pxx_noise_0, '-o', alpha=0.4, color='m', markersize=2, label='Noisy Sinewave 0')
-plt.semilogy(f, pxx_noise_1, '-o', alpha=0.4, color='c', markersize=2, label='Noisy Sinewave 1')
-plt.semilogy(f, pxx_noise_2, '-o', alpha=0.4, color='g', markersize=2, label='Noisy Sinewave 2')
+plt.semilogy(f, pxx_noisy_sinewave_0, '-o', alpha=0.4, color='m', markersize=2, label='Noisy Sinewave 0')
+plt.semilogy(f, pxx_noisy_sinewave_1, '-o', alpha=0.4, color='c', markersize=2, label='Noisy Sinewave 1')
+plt.semilogy(f, pxx_noisy_sinewave_2, '-o', alpha=0.4, color='g', markersize=2, label='Noisy Sinewave 2')
 
 #plot details
 plt.xlim([0, 370])
@@ -215,3 +220,23 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
+
+# %%
+#plotting just the noise
+plt.figure(figsize=(10,4), dpi=200)
+plt.semilogy(f, pxx_noise_0, '-o', alpha=0.4, color='m', markersize=2, label='Noisy Sinewave 0')
+plt.semilogy(f, pxx_noise_1, '-o', alpha=0.4, color='c', markersize=2, label='Noisy Sinewave 1')
+plt.semilogy(f, pxx_noise_2, '-o', alpha=0.4, color='g', markersize=2, label='Noisy Sinewave 2')
+
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+#also, change figure size to 10, 4
+
+plt.xlim([0,370])
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Power")
+plt.title("Noise Spectra")
+plt.legend
+plt.tight_layout()
+plt.show()
+# %%
