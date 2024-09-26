@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.signal as signal
+from scipy.io import loadmat
 
 # %%
 #creating and printing the sine wave
@@ -32,9 +33,6 @@ def sine_wave_generator(duration_s, sample_rate, freq, amp=1, phase=0, n_harmoni
             # add harmonic to signal
             x = x + x_har
     return t, x 
-
-def spike_generator(x):
-    pass
 
 def noise_generator(x=sinewave, noise_mean=0, noise_std=1):
     """ generates randomized Gaussian noise with specified mean and standard deviation
@@ -151,7 +149,7 @@ NFFT = 20000
 NPERSEG = 20000
 NOVERLAP = 4000
 
-f, pxx = signal.welch(sinewave, nperseg = NPERSEG, nfft = NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
+f, pxx = signal.welch(x, nperseg = NPERSEG, nfft = NFFT, noverlap = NOVERLAP, fs = SAMPLE_RATE)
 ax2.semilogy(f, pxx, '-o',color = 'k', markersize = 2, alpha = 0.4)
 ax2.spines["top"].set_visible(False)
 ax2.spines["right"].set_visible(False)
@@ -203,7 +201,8 @@ f, pxx_noisy_sinewave_2 = signal.welch(noisy_sinewave_2, nperseg=NPERSEG, nfft=N
 f, pxx_noise_0 = signal.welch(noise_0, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 f, pxx_noise_1 = signal.welch(noise_1, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 f, pxx_noise_2 = signal.welch(noise_2, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-#plotting the original and noisy plots on top of each otherplt.figure(figsize=(10,4), dpi=200)
+
+#plotting the original and noisy plots on top of each other
 plt.figure(figsize=(10, 4), dpi=200)
 
 plt.semilogy(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='Clean Sinewave')
@@ -239,4 +238,41 @@ plt.title("Noise Spectra")
 plt.legend
 plt.tight_layout()
 plt.show()
+
+
+
+
+# %%
+#plotting the real emg data, looking at keys and info
+emgdata = loadmat('J10_s10_i0_pref.mat')
+rawdata = emgdata['emg_full_raw'].flatten() #needs to be  a 1D array for welch function
+for key in emgdata:
+    if not key.startswith('__'):
+        print(f"\nKey: {key}")
+        print(f"Type: {type(emgdata[key])}")
+        print(f"Shape: {emgdata[key].shape}")
+
+# %%
+#plotting emg data spectra
+
+#calculate sampling rate
+time_vector = emgdata['t_emg'].flatten()
+intervals = np.diff(time_vector)
+SAMPLE_RATE = 1/np.mean(intervals) 
+
+#parameters
+NFFT = 50000 #Use sampling rate/NFFT = 0.1
+NPERSEG = 50000
+NOVERLAP = 10000 #Use .2 (NFFT) = NOVERLAP
+
+#plotting
+f, pxx = signal.welch(rawdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.figure(figsize=(10,4), dpi=200)
+plt.semilogy(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='ENG raw data')
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Power")
+plt.xlabel("Frequency (Hz)")
+plt.title("Frequency Domain")
+plt.tight_layout()
 # %%
