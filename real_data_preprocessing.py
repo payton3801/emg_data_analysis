@@ -52,3 +52,21 @@ plt.tight_layout()
 #plt.xlim([0,500])
 
 # %%
+#pre-processing step 1: notch filters at 60 Hz, 120 Hz, 240 Hz, 300 Hz, 420 Hz
+notch_frequencies= [60, 120, 240, 300, 420]
+Q = 30.0
+
+notchdata = rawdata
+for f0 in notch_frequencies:
+    b, a = signal.iirnotch(f0, Q, SAMPLE_RATE)
+    notchdata = signal.filtfilt(b, a, notchdata)
+
+f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with nothc filters')
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Power")
+plt.xlabel("Frequency (Hz)")
+plt.title("Frequency Domain")
+plt.tight_layout()
+#plt.xlim([0,500])
