@@ -14,6 +14,9 @@ for key in emgdata:
         print(f"Type: {type(emgdata[key])}")
         print(f"Shape: {emgdata[key].shape}")
 
+plt.rcParams['agg.path.chunksize'] = 10000
+
+
 # %%
 #emg data pramaters
 
@@ -57,16 +60,46 @@ notch_frequencies= [60, 120, 240, 300, 420]
 Q = 30.0
 
 notchdata = rawdata
-for f0 in notch_frequencies:
-    b, a = signal.iirnotch(f0, Q, SAMPLE_RATE)
+for frequencies in notch_frequencies:
+    b, a = signal.iirnotch(frequencies, Q, SAMPLE_RATE)
     notchdata = signal.filtfilt(b, a, notchdata)
 
 f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with nothc filters')
+plt.figure(figsize=(10,4), dpi = 200)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with notch filters')
 plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.ylabel("Power")
 plt.xlabel("Frequency (Hz)")
 plt.title("Frequency Domain")
 plt.tight_layout()
-#plt.xlim([0,500])
+
+# %%
+#pre-processing step 2: 4th order butterworth high pass filter with cutoff at 65 Hz
+b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
+output = signal.filtfilt(b, a, notchdata)
+
+#plotting the frequency spectrum
+duration = len(notchdata) / SAMPLE_RATE
+t = np.linspace(0, duration, len(notchdata), endpoint=False)
+
+plt.figure(plt.figure(figsize=(10,4), dpi=200))
+plt.plot(t, output)
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.tight_layout()
+
+f, pxx = signal.welch(output, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.figure(figsize=(10,4), dpi = 200)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Power")
+plt.xlabel("Frequency (Hz)")
+plt.title("Frequency Domain of Butterworth Filtered Data")
+# %%
+#scatterplot of the above
+duration = len(notchdata) / SAMPLE_RATE
+t = np.linspace(0, duration, len(notchdata), endpoint=False)
+plt.scatter(t, output)
+# %%
