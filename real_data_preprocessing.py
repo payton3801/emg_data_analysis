@@ -6,8 +6,8 @@ import scipy.signal as signal
 from scipy.io import loadmat# %%
 #plotting the real emg data, looking at keys and info
 emgdata = loadmat('J10_s10_i0_pref.mat')
-rawdata = emgdata['emg_full_raw'].flatten() #needs to be  a 1D array for welch function
-filterdata = emgdata['emg_full_fil'].flatten()
+rawdata = emgdata['emg_full_raw'] #needs to be  a 1D array for welch function
+filterdata = emgdata['emg_full_fil']
 for key in emgdata:
     if not key.startswith('__'):
         print(f"\nKey: {key}")
@@ -42,8 +42,9 @@ plt.gca().spines["right"].set_visible(False)
 plt.xlim([0,30])
 
 # %%
+CHAN_IX = 2 #12 channels
 #plotting the spectra
-f, pxx = signal.welch(rawdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx = signal.welch(rawdata[:,CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.figure(figsize=(10,4), dpi=200)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='ENG raw data')
 plt.gca().spines["top"].set_visible(False)
@@ -56,12 +57,14 @@ plt.tight_layout()
 
 # %%
 #pre-processing step 1: notch filters at 60 Hz, 120 Hz, 240 Hz, 300 Hz, 420 Hz
+bandwidth = 2
 notch_frequencies= [60, 120, 240, 300, 420]
-Q = 30.0
+Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
+#compute given freq/bandwidth
 
-notchdata = rawdata
-for frequencies in notch_frequencies:
-    b, a = signal.iirnotch(frequencies, Q, SAMPLE_RATE)
+notchdata = rawdata[:,CHAN_IX]
+for freq, q in zip(notch_frequencies, Q):
+    b, a = signal.iirnotch(freq, q, SAMPLE_RATE)
     notchdata = signal.filtfilt(b, a, notchdata)
 
 f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
@@ -77,19 +80,19 @@ plt.tight_layout()
 # %%
 #pre-processing step 2: 4th order butterworth high pass filter with cutoff at 65 Hz
 b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
-output = signal.filtfilt(b, a, notchdata)
+filtereddata = signal.filtfilt(b, a, notchdata)
 
 #plotting the frequency spectrum
 duration = len(notchdata) / SAMPLE_RATE
 t = np.linspace(0, duration, len(notchdata), endpoint=False)
 
 plt.figure(plt.figure(figsize=(10,4), dpi=200))
-plt.plot(t, output)
+plt.plot(t, filtereddata)
 plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.tight_layout()
 
-f, pxx = signal.welch(output, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx = signal.welch(filtereddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.figure(figsize=(10,4), dpi = 200)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
 plt.gca().spines["top"].set_visible(False)
@@ -97,9 +100,16 @@ plt.gca().spines["right"].set_visible(False)
 plt.ylabel("Power")
 plt.xlabel("Frequency (Hz)")
 plt.title("Frequency Domain of Butterworth Filtered Data")
+
 # %%
-#scatterplot of the above
-duration = len(notchdata) / SAMPLE_RATE
-t = np.linspace(0, duration, len(notchdata), endpoint=False)
-plt.scatter(t, output)
+#overlaying all plots on top of each other
+f, pxx = signal.welch(rawdata[:,CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='r', markersize=2, label = "Raw data")
+
+f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='b', markersize=2, label = "Notch-filtered data")
+
+f, pxx = signal.welch(filtereddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label = "Butterworth-filtered data")
+
 # %%
