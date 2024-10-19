@@ -131,7 +131,8 @@ for CHAN_IX in range(num_channels):
         notchdata = signal.filtfilt(b, a, notchdata)
     
     ax = axes[CHAN_IX]
-    ax.plot(notchdata, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with notch filters')
+    f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+    ax.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with notch filters')
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_ylabel("Power")
@@ -168,7 +169,7 @@ plt.xlabel("Frequency (Hz)")
 plt.title("Frequency Domain of Butterworth Filtered Data")
 
 # %%
-#running all channels for butterworth filter, showing time and should also plot frequency later
+#running all channels for butterworth filter
 
 fig, axes = plt.subplots(3, 4, figsize = (20,15))
 axes = axes.flatten()
@@ -184,7 +185,8 @@ for CHAN_IX in range(num_channels):
 
 
     ax = axes[CHAN_IX]
-    ax.plot(butterworthdata, '-o', alpha=0.4, color='k', markersize=2)
+    f, pxx = signal.welch(butterworthdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+    ax.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_ylabel("Power")
@@ -221,11 +223,17 @@ plt.figure(figsize=(10, 4), dpi=200)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
 
 # %%
-#rectified emg for all signals
+#rectified emg for all signals -- able to run independently after loading rawdata
+num_channels = 12
+bandwidth = 2
+notch_frequencies= [60, 120, 240, 300, 420]
+Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
+
 fig, axes = plt.subplots(3, 4, figsize=(20, 15))
 axes = axes.flatten()
 channel_names = emgdata['emg_names'].flatten()
 channel_names = emgdata['emg_names'][0]
+channel_names = [str(name[0]) for name in channel_names]
 
 for CHAN_IX in range(num_channels):
     notchdata = rawdata[:, CHAN_IX]
@@ -249,7 +257,7 @@ for CHAN_IX in range(num_channels):
     ax.plot(t, rectifieddata, '-o', alpha=0.4, color='k', markersize=2)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_ylabel("Amplitude")
+    ax.set_ylabel(f"{channel_names[CHAN_IX]}")
     ax.set_xlabel("Time (s)")
     ax.set_title(f"Rectified EMG for Channel {channel_names[CHAN_IX]}")
     ax.set_xlim([0,30])
