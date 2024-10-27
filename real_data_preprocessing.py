@@ -26,11 +26,20 @@ time_vector = emgdata['t_emg']
 intervals = np.diff(time_vector)
 SAMPLE_RATE = 1/np.mean(intervals) 
 
-#parameters
+#general parameters
 NFFT = 50000 #Use sampling rate/NFFT = 0.1
 NPERSEG = 50000
 NOVERLAP = 10000 #Use .2 (NFFT) = NOVERLAP
-CHAN_IX = 1 #12 channels
+CHAN_IX = 1 
+num_channels = rawdata.shape[1]
+
+#notch filter parameters
+bandwidth = 2
+notch_frequencies= [60, 120, 240, 300, 420]
+
+channel_names = emgdata['emg_names'].flatten()
+channel_names = emgdata['emg_names'][0]
+channel_names = [str(name[0]) for name in channel_names]
 
 # %%
 #plotting the full raw data
@@ -46,79 +55,42 @@ plt.xlim([0,120])
 # %%
 #processing pipeline for one channel
 #pre-processing step 1: notch filters at 60 Hz, 120 Hz, 240 Hz, 300 Hz, 420 Hz
-f, pxx = signal.welch(rawdata[:,CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-plt.figure(figsize=(10,4), dpi=200)
-plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='ENG raw data')
-plt.gca().spines["top"].set_visible(False)
-plt.gca().spines["right"].set_visible(False)
-plt.ylabel("Power")
-plt.xlabel("Frequency (Hz)")
-plt.title(f"Frequency Domain of Channel {[CHAN_IX]}")
-plt.tight_layout()
-#plt.xlim([0,500])
+def apply_notch_filter(x, notch_frequencies, bandwidth, sample_rate):
+    """ 
+        apply notch filter(s) to a designated channel
+        notch_frequencies = desired frequencies to be filtered out (Hz)
+        x = signal data being filtered
+        bandwidth = bandwidth of notch filter (Hz)
+        sample_rate = sampling rate of the signal (Hz)
+    """
 
-bandwidth = 2
-notch_frequencies= [60, 120, 240, 300, 420]
-Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
+    Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
+    for freq, q in zip(notch_frequencies, Q):
+        b, a = signal.iirnotch(freq, q, SAMPLE_RATE)
+        x = signal.filtfilt(b, a, x)
 
+    return x
 
-notchdata = rawdata[:, CHAN_IX]
-for freq, q in zip(notch_frequencies, Q):
-    b, a = signal.iirnotch(freq, q, SAMPLE_RATE)
-    notchdata = signal.filtfilt(b, a, notchdata)
+def apply_butterworth_filter(x):
+    """
+        apply 4th order butterworth high pass filter with cutoff at 65 Hz
+        x = signal data being filtered
+    """
 
-f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-plt.figure(figsize=(10,4), dpi = 200)
-plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='EMG data with notch filters')
-plt.gca().spines["top"].set_visible(False)
-plt.gca().spines["right"].set_visible(False)
-plt.ylabel("Power")
-plt.xlabel("Frequency (Hz)")
-plt.title(f"Frequency Domain of Channel {[CHAN_IX]} after Notch Filter")
-plt.tight_layout()
-
-#pre-processing step 2: 4th order butterworth high pass filter with cutoff at 65 Hz
-b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
-butterworthdata = signal.filtfilt(b, a, notchdata)
-
-#plotting the frequency spectrum
-duration = len(notchdata) / SAMPLE_RATE
-t = np.linspace(0, duration, len(notchdata), endpoint=False)
-plt.title(f"Frequency Spectra of Channel {[CHAN_IX]} after Notch Filter")
-
-
-# plt.figure(plt.figure(figsize=(10,4), dpi=200))
-# plt.plot(t, butterworthdata)
-# plt.gca().spines["top"].set_visible(False)
-# plt.gca().spines["right"].set_visible(False)
-# plt.tight_layout()
-
-#rectified emg spectra
-f, pxx = signal.welch(butterworthdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-plt.figure(figsize=(10,4), dpi = 200)
-plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
-plt.gca().spines["top"].set_visible(False)
-plt.gca().spines["right"].set_visible(False)
-plt.ylabel("Power")
-plt.xlabel("Frequency (Hz)")
-plt.title("Frequency Domain of Butterworth Filtered Data")
-
-channel_names = emgdata['emg_names'].flatten()
-channel_names = emgdata['emg_names'][0]
-channel_names = [str(name[0]) for name in channel_names]
-
-notchdata = rawdata[:, CHAN_IX]
-for freq, q in zip(notch_frequencies, Q):
-    b, a = signal.iirnotch(freq, q, SAMPLE_RATE)
-    notchdata = signal.filtfilt(b, a, notchdata)
-
-# Apply Butterworth filter
-b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
-butterworthdata = signal.filtfilt(b, a, notchdata)
+    b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
+    butterworth = signal.filtfilt(b, a, x)
+    return butterworth
 
 # Rectify the EMG signal
-rectifieddata = np.abs(butterworthdata)
+applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+applied_butter = apply_butterworth_filter(applied_notch)
+rectifieddata = np.abs(applied_butter)
 
+notchdata = np.zeros_like(rawdata)
+for i in range(rawdata.shape[1]):
+    notchdata[:,i] = apply_notch_filter(rawdata[:,i], notch_frequencies, bandwidth, SAMPLE_RATE)
+
+# %%
 # Time vector for plotting
 duration = len(rectifieddata) / SAMPLE_RATE
 t = np.linspace(0, duration, len(rectifieddata), endpoint=False)
@@ -148,87 +120,63 @@ plt.show()
 #overlaying all spectras on top of each other
 plt.figure(figsize=(10,4), dpi = 200)
 plt.title(f"Overlaid plots for muscle {channel_names[CHAN_IX]}")
-
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Power")
+plt.xlabel("Frequency (Hz)")
 
 f, pxx = signal.welch(rawdata[:, CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='r', markersize=2, label = "Raw data")
 
-f, pxx = signal.welch(notchdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx = signal.welch(applied_notch, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='b', markersize=2, label = "Notch-filtered data")
 
-f, pxx = signal.welch(butterworthdata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+f, pxx = signal.welch(applied_butter, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label = "Butterworth-filtered data")
 
 f, pxx = signal.welch(rectifieddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='g', markersize=2, label = "Rectified data")
 
 plt.legend()
+
 # %%
 #rectified emg for all signals -- able to run independently after loading rawdata
 #proceessing pipeline for grid of all channels
-num_channels = 12
-bandwidth = 2
-notch_frequencies= [60, 120, 240, 300, 420]
-Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
-
 
 fig, axes = plt.subplots(3, 4, figsize=(20, 15), dpi=200)
 axes=axes.flatten()
 
 for CHAN_IX in range(num_channels):
-    # Plotting the raw data for the specific channel
+    #why do i have to redefine these variables here
+    x = rawdata[:, CHAN_IX]
+    applied_notch = apply_notch_filter(x, notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter = apply_butterworth_filter(applied_notch)
+    rectifieddata = np.abs(applied_butter)
+
     ax = axes[CHAN_IX]
-    f, pxx = signal.welch(rawdata[:,CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
-    ax.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2, label='ENG raw data')
+    f_raw, pxx_raw = signal.welch(rawdata[:, CHAN_IX], nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+    f_notch, pxx_notch = signal.welch(applied_notch, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+    f_butter, pxx_butter = signal.welch(applied_butter, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+    f_rectified, pxx_rectified = signal.welch(rectifieddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
+
+    ax.loglog(f_raw, pxx_raw, '-o', alpha=0.4, color='r', markersize=2, label='Raw data')
+    ax.loglog(f_notch, pxx_notch, '-o', alpha=0.4, color='b', markersize=2, label='Notch-filtered data')
+    ax.loglog(f_butter, pxx_butter, '-o', alpha=0.4, color='k', markersize=2, label='Butterworth-filtered data')
+    ax.loglog(f_rectified, pxx_rectified, '-o', alpha=0.4, color='g', markersize=2, label='Rectified data')
+
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Power")
-    ax.set_title(f"Spectra for Muscle {CHAN_IX+1}")
+    ax.set_title(f"Spectra for {channel_names[CHAN_IX]}")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-plt.tight_layout()
-plt.show()
 
-fig, axes = plt.subplots(3, 4, figsize=(20, 15))
-axes = axes.flatten()
-
-channel_names = emgdata['emg_names'].flatten()
-channel_names = emgdata['emg_names'][0]
-channel_names = [str(name[0]) for name in channel_names]
-
-for CHAN_IX in range(num_channels):
-    notchdata = rawdata[:, CHAN_IX]
-    for freq, q in zip(notch_frequencies, Q):
-        b, a = signal.iirnotch(freq, q, SAMPLE_RATE)
-        notchdata = signal.filtfilt(b, a, notchdata)
-    
-    # Apply Butterworth filter
-    b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
-    butterworthdata = signal.filtfilt(b, a, notchdata)
-
-    # Rectify the EMG signal
-    rectifieddata = np.abs(butterworthdata)
-
-    # Time vector for plotting
-    duration = len(rectifieddata) / SAMPLE_RATE
-    t = np.linspace(0, duration, len(rectifieddata), endpoint=False)
-
-    # Plot rectified EMG data
-    ax = axes[CHAN_IX]
-    ax.plot(t, rectifieddata, '-o', alpha=0.4, color='k', markersize=2)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    ax.set_ylabel(f"{channel_names[CHAN_IX]}")
-    ax.set_xlabel("Time (s)")
-    ax.set_title(f"Rectified EMG for Muscle {channel_names[CHAN_IX]}")
-    ax.set_xlim([0,30])
-
-
+axes[0].legend()
 plt.tight_layout()
 plt.show()
 
 # %%
 #rectifying emg signal across a single channel
-rectifieddata = np.abs(butterworthdata)
+rectifieddata = np.abs(applied_butter)
 
 #timeplot
 duration = len(rectifieddata) / SAMPLE_RATE
@@ -247,4 +195,7 @@ plt.xlim([0,30])
 f, pxx = signal.welch(rectifieddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.figure(figsize=(10, 4), dpi=200)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
+
 # %%
+#resampling EMG to 500 Hz
+resampled_data = signal.decimate(rectifieddata, q, n=None, ftype='iir', axis=-1, zero_phase=True)
