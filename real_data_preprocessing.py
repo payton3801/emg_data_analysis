@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 from scipy.io import loadmat
+import math
 
 # %%
 #plotting the real emg data, looking at keys and info
@@ -30,7 +31,7 @@ SAMPLE_RATE = 1/np.mean(intervals)
 NFFT = 50000 #Use sampling rate/NFFT = 0.1
 NPERSEG = 50000
 NOVERLAP = 10000 #Use .2 (NFFT) = NOVERLAP
-CHAN_IX = 1 
+CHAN_IX = 0
 num_channels = rawdata.shape[1]
 
 #notch filter parameters
@@ -188,14 +189,41 @@ plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.ylabel("Amplitude")
 plt.xlabel("Time(s)")
-plt.title(f"Rectified EMG for {channel_names[CHAN_IX]}")
+plt.title(f"Rectified EMG for Muscle {channel_names[CHAN_IX]}")
 plt.xlim([0,30])
 
 #frequency plot
 f, pxx = signal.welch(rectifieddata, nperseg=NPERSEG, nfft=NFFT, noverlap=NOVERLAP, fs=SAMPLE_RATE)
 plt.figure(figsize=(10, 4), dpi=200)
 plt.loglog(f, pxx, '-o', alpha=0.4, color='k', markersize=2)
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Power")
+plt.xlabel("Frequency(Hz)")
+plt.title(f"Rectified EMG for Muscle {channel_names[CHAN_IX]}")
+plt.xlim([0,30])
 
 # %%
 #resampling EMG to 500 Hz
-resampled_data = signal.decimate(rectifieddata, q, n=None, ftype='iir', axis=-1, zero_phase=True)
+SAMPLE_RATE = round(SAMPLE_RATE)
+TARGET_SAMPLE_RATE = 500
+DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+resampled_data = signal.decimate(rectifieddata, q = DOWNSAMPLING, n=None, ftype='iir', axis=-1, zero_phase=True)
+    #check: axis = 1 and zero_phase = True?
+duration = len(resampled_data) / TARGET_SAMPLE_RATE
+time_vector = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+# Plotting the resampled data over time
+plt.figure(figsize=(10,4), dpi=200)
+plt.plot(t, rectifieddata, 'r--', color='b', alpha=0.7, marker = 'o', markersize=3, label='Original Data')
+plt.plot(time_vector, resampled_data, 'r--', alpha=0.7, marker='o', markersize=3, label='Resampled Data')
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Amplitude")
+plt.xlabel("Time (s)")
+plt.title(f"Resampled Rectified EMG for Muscle {channel_names[0]}")
+plt.tight_layout()
+plt.xlim([0,10])
+
+plt.show()
+# %%
