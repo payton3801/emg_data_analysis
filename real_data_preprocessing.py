@@ -208,22 +208,60 @@ plt.xlim([0,30])
 SAMPLE_RATE = round(SAMPLE_RATE)
 TARGET_SAMPLE_RATE = 500
 DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
-resampled_data = signal.decimate(rectifieddata, q = DOWNSAMPLING, n=None, ftype='iir', axis=-1, zero_phase=True)
+#resampled_data1 = signal.decimate(rectifieddata, q = DOWNSAMPLING, n=None, ftype='iir', axis=-1, zero_phase=True)
     #check: axis = 1 and zero_phase = True?
+resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
 duration = len(resampled_data) / TARGET_SAMPLE_RATE
-time_vector = np.linspace(0, duration, len(resampled_data), endpoint=False)
+t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
 # Plotting the resampled data over time
 plt.figure(figsize=(10,4), dpi=200)
-plt.plot(t, rectifieddata, 'r--', color='b', alpha=0.7, marker = 'o', markersize=3, label='Original Data')
-plt.plot(time_vector, resampled_data, 'r--', alpha=0.7, marker='o', markersize=3, label='Resampled Data')
+plt.plot(t, rectifieddata, 'r--', color='k', alpha=0.7, marker = 'o', markersize=3, label='Original Data')
+#plt.plot(t2, resampled_data1, 'r--', color = 'b', alpha=0.7, marker='o', markersize=3, label='Decimate')
+plt.plot(t2, resampled_data, 'r--', color = 'g', alpha=0.7, marker='o', markersize=3, label='Resample-poly')
+
 plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.ylabel("Amplitude")
 plt.xlabel("Time (s)")
-plt.title(f"Resampled Rectified EMG for Muscle {channel_names[0]}")
+plt.title(f"Resampled Rectified EMG for Muscle {channel_names[CHAN_IX]}")
 plt.tight_layout()
-plt.xlim([0,10])
+plt.xlim([0, 5])
+plt.ylim([0, .33]) #for zooming in/ filling the whitespace
 
+#plt.xlim([0.3, 0.4])
+#plt.ylim([0, .33]) #for looking super close
+
+plt.legend()
 plt.show()
+
 # %%
+#quartile clipping the data by the 99.99th percentile
+quantiled_data = np.quantile(resampled_data, .9999)
+quantiled_data1 = np.quantile(resampled_data, .99)
+quantiled_data2 = np.quantile(resampled_data, .95)
+quantiled_data3 = np.quantile(resampled_data, .90)
+clipped_data = np.clip(resampled_data, a_max = quantiled_data, a_min=None)
+clipped_data1 = np.clip(resampled_data, a_max = quantiled_data1, a_min=None)
+clipped_data2 = np.clip(resampled_data, a_max = quantiled_data2, a_min=None)
+clipped_data3 = np.clip(resampled_data, a_max = quantiled_data3, a_min=None)
+duration = len(clipped_data) / TARGET_SAMPLE_RATE
+t3 = np.linspace(0, duration, len(clipped_data), endpoint=False)
+
+
+#plotting
+plt.figure(figsize=(10,4), dpi=200)
+plt.plot(t2, resampled_data, 'r--', color='r', alpha=0.7, marker = 'o', markersize=3, label='Original Data')
+plt.plot(t3, clipped_data, 'r--', color='g', alpha=0.7, marker='o', markersize=3, label='99.99')
+plt.plot(t3, clipped_data1, 'r--', color = 'b', alpha=0.7, marker='o', markersize=3, label='99')
+plt.plot(t3, clipped_data2, 'r--', color = 'm', alpha=0.7, marker='o', markersize=3, label='95')
+plt.plot(t3, clipped_data3, 'r--', color = 'k', alpha=0.7, marker='o', markersize=3, label='90')
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Amplitude")
+plt.xlabel("Time (s)")
+plt.title(f"Quantile Clipping for Muscle {channel_names[CHAN_IX]}")
+plt.tight_layout()
+plt.legend()
+
+ # %%
