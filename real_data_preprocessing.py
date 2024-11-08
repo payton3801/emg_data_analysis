@@ -224,12 +224,15 @@ for CHAN_IX in range(num_channels):
     SAMPLE_RATE = round(SAMPLE_RATE)
     TARGET_SAMPLE_RATE = 500
     DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+
+
     resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
     duration = len(resampled_data) / TARGET_SAMPLE_RATE
     t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
     # Time vector for plotting
     t = np.linspace(0, len(rectifieddata) / SAMPLE_RATE, len(rectifieddata), endpoint=False)
+
 
     # Plotting the resampled data over time
     plt.figure(figsize=(10, 4), dpi=200)
@@ -247,9 +250,39 @@ for CHAN_IX in range(num_channels):
 
     plt.legend()
     plt.show()
+
+
+#running .99 notch for channel 6
+applied_notch = apply_notch_filter(rawdata[:, 6], notch_frequencies, bandwidth, SAMPLE_RATE)
+applied_butter = apply_butterworth_filter(applied_notch)
+rectifieddata = np.abs(applied_butter)
+SAMPLE_RATE = round(SAMPLE_RATE)
+TARGET_SAMPLE_RATE = 500
+DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+duration = len(resampled_data) / TARGET_SAMPLE_RATE
+t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+quartiled_data_99 = np.quantile(resampled_data, .99)
+clipped_data1 = np.clip(resampled_data, a_max=quartiled_data_99, a_min=None)
+duration = len(clipped_data1) / TARGET_SAMPLE_RATE
+plt.plot(t2, resampled_data, 'r--', color='r', alpha=0.7, marker='o', markersize=3, label='Original Data')
+t3 = np.linspace(0, duration, len(clipped_data1), endpoint=False)
+plt.plot(t3, clipped_data1, 'r--', color='b', alpha=0.7, marker='o', markersize=3, label='99')
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.ylabel("Amplitude")
+plt.xlabel("Time (s)")
+plt.title(f"Quantile Clipping for Muscle {channel_names[CHAN_IX]}")
+plt.tight_layout()
+plt.legend()
+plt.show()
+
+
 # %%
 #quartile clipping the data 
 for CHAN_IX in range(num_channels):
+    if CHAN_IX == 6:
+        continue
     # Apply notch filter
     applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
     
@@ -268,24 +301,24 @@ for CHAN_IX in range(num_channels):
     t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
     # Quartile clipping the data
-    quartiled_data_9999 = np.quantile(resampled_data, .9999)
-    quartiled_data_99 = np.quantile(resampled_data, .99)
-    quartiled_data_95 = np.quantile(resampled_data, .95)
-    quartiled_data_90 = np.quantile(resampled_data, .90)
-    clipped_data = np.clip(resampled_data, a_max=quartiled_data_9999, a_min=None)
-    clipped_data1 = np.clip(resampled_data, a_max=quartiled_data_99, a_min=None)
-    clipped_data2 = np.clip(resampled_data, a_max=quartiled_data_95, a_min=None)
-    clipped_data3 = np.clip(resampled_data, a_max=quartiled_data_90, a_min=None)
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    #quartiled_data_99 = np.quantile(resampled_data, .99)
+    #quartiled_data_95 = np.quantile(resampled_data, .95)
+    #quartiled_data_90 = np.quantile(resampled_data, .90)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    #clipped_data1 = np.clip(resampled_data, a_max=quartiled_data_99, a_min=None)
+    #clipped_data2 = np.clip(resampled_data, a_max=quartiled_data_95, a_min=None)
+    #clipped_data3 = np.clip(resampled_data, a_max=quartiled_data_90, a_min=None)
     duration = len(clipped_data) / TARGET_SAMPLE_RATE
     t3 = np.linspace(0, duration, len(clipped_data), endpoint=False)
 
     # Plotting
     plt.figure(figsize=(10, 4), dpi=200)
     plt.plot(t2, resampled_data, 'r--', color='r', alpha=0.7, marker='o', markersize=3, label='Original Data')
-    plt.plot(t3, clipped_data, 'r--', color='g', alpha=0.7, marker='o', markersize=3, label='99.99')
-    plt.plot(t3, clipped_data1, 'r--', color='b', alpha=0.7, marker='o', markersize=3, label='99')
-    plt.plot(t3, clipped_data2, 'r--', color='m', alpha=0.7, marker='o', markersize=3, label='95')
-    plt.plot(t3, clipped_data3, 'r--', color='k', alpha=0.7, marker='o', markersize=3, label='90')
+    plt.plot(t3, clipped_data, 'r--', color='g', alpha=0.7, marker='o', markersize=3, label='99.9')
+    #plt.plot(t3, clipped_data1, 'r--', color='b', alpha=0.7, marker='o', markersize=3, label='99')
+    #plt.plot(t3, clipped_data2, 'r--', color='m', alpha=0.7, marker='o', markersize=3, label='95')
+    #plt.plot(t3, clipped_data3, 'r--', color='k', alpha=0.7, marker='o', markersize=3, label='90')
     plt.gca().spines["top"].set_visible(False)
     plt.gca().spines["right"].set_visible(False)
     plt.ylabel("Amplitude")
@@ -296,7 +329,8 @@ for CHAN_IX in range(num_channels):
     plt.show()
 
 # %%
-#plotting quantile scaling the data, using .95 as the clip
+#looping over every channel
+
 for CHAN_IX in range(num_channels):
     # Apply notch filter
     applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
@@ -312,15 +346,16 @@ for CHAN_IX in range(num_channels):
     TARGET_SAMPLE_RATE = 500
     DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
     resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
-    quartiled_data_9999 = np.quantile(resampled_data, .9999)
-    clipped_data = np.clip(resampled_data, a_max=quartiled_data_9999, a_min=None)
-
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data = np.abs(clipped_data)
 
     # Quartile clipping the data
     quartiled_data_95 = np.quantile(clipped_data, .95)
     duration = len(resampled_data) / TARGET_SAMPLE_RATE
     t = np.linspace(0, duration, len(resampled_data), endpoint=False)
     normalized_data = clipped_data / quartiled_data_95
+    normalized_data = np.abs(normalized_data)
 
     # Plotting time series data
     fig, axes = plt.subplots(2, 1, figsize=(20, 8), dpi=200)
@@ -347,9 +382,11 @@ for CHAN_IX in range(num_channels):
 
 # %%
 #step 5: plotting all muscle traces on top of each other
-fig, axes = plt.subplots(2, 1, figsize=(20, 8), dpi=200)
+fig, axes = plt.subplots(2, 1, figsize=(10, 4), dpi=200)
 
 for CHAN_IX in range(num_channels):
+    if CHAN_IX == 6:
+        continue
     applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
     applied_butter = apply_butterworth_filter(applied_notch)
     rectifieddata = np.abs(applied_butter)
@@ -359,14 +396,16 @@ for CHAN_IX in range(num_channels):
     TARGET_SAMPLE_RATE = 500
     DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
     resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
-    quartiled_data_9999 = np.quantile(resampled_data, .9999)
-    clipped_data = np.clip(resampled_data, a_max=quartiled_data_9999, a_min=None)
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data = np.abs(clipped_data)
 
     # Quartile clipping the data
     quartiled_data_95 = np.quantile(clipped_data, .95)
     duration = len(resampled_data) / TARGET_SAMPLE_RATE
     t = np.linspace(0, duration, len(resampled_data), endpoint=False)
     normalized_data = clipped_data / quartiled_data_95
+    normalized_data=np.abs(normalized_data)
 
     # Plot of clipped data
     axes[0].plot(t, clipped_data, alpha=0.5, label=f'Clipped Data {channel_names[CHAN_IX]}')
@@ -380,8 +419,70 @@ for CHAN_IX in range(num_channels):
     axes[1].set_xlim([0, duration])
     axes[1].set_title("Time plots of Normalized Data")
 
-# Show the plots
+CHAN_IX = 6
+applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+applied_butter = apply_butterworth_filter(applied_notch)
+rectifieddata = np.abs(applied_butter)
+SAMPLE_RATE = round(SAMPLE_RATE)
+TARGET_SAMPLE_RATE = 500
+DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+quartiled_data_99 = np.quantile(resampled_data, .99)
+clipped_data = np.clip(resampled_data, a_max=quartiled_data_99, a_min=None)
+clipped_data = np.abs(clipped_data)
+quartiled_data_95 = np.quantile(clipped_data, .95)
+duration = len(resampled_data) / TARGET_SAMPLE_RATE
+t = np.linspace(0, duration, len(resampled_data), endpoint=False)
+normalized_data = clipped_data / quartiled_data_95
+
+# Plot of clipped data for channel 6
+axes[0].plot(t, clipped_data, alpha=0.5, label=f'Clipped Data {channel_names[CHAN_IX]}')
+axes[0].axhline(y=quartiled_data_95, color='k', linestyle='--', label='95th Quantile')
+axes[0].set_xlim([0, duration])
+axes[0].set_title("Time plots of Clipped Data")
+
+# Plot of normalized data for channel 6
+axes[1].plot(t, normalized_data, alpha=0.5, label=f'Normalized Data {channel_names[CHAN_IX]}')
+axes[1].axhline(y=1, color='k', linestyle='--', label='95th Quantile')
+axes[1].set_xlim([0, duration])
+axes[1].set_title("Time plots of Normalized Data")
+
+# Show the plot
+# plt.legend()
 plt.tight_layout()
+plt.show()
+
+# %%
+#plotting the muscle traces stacked on each other
+offset = 3.5  # Define an offset value
+plt.figure(figsize=(5,4), dpi=200)
+
+for CHAN_IX in [3, 2, 1]:
+    applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter = apply_butterworth_filter(applied_notch)
+    rectifieddata = np.abs(applied_butter)
+    SAMPLE_RATE = round(SAMPLE_RATE)
+    TARGET_SAMPLE_RATE = 500
+    DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+    resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+    quartiled_data_99 = np.quantile(resampled_data, .99)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_99, a_min=None)
+    clipped_data = np.abs(clipped_data)
+    quartiled_data_95 = np.quantile(clipped_data, .95)
+    duration = len(resampled_data) / TARGET_SAMPLE_RATE
+    t = np.linspace(0, duration, len(resampled_data), endpoint=False)
+    normalized_data = clipped_data / quartiled_data_95
+
+    # Plot of normalized data with offset
+    plt.plot(t, normalized_data + CHAN_IX * offset, alpha=0.5, label=channel_names[CHAN_IX])
+    plt.xlim([0, 2])
+    plt.xlabel('Time in seconds')
+    plt.title("Time plots of Normalized Data")
+
+# Show the plot
+plt.tight_layout()
+plt.yticks([])
+plt.legend()
 plt.show()
 
 # %%
