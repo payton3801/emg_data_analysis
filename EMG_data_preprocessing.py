@@ -45,7 +45,7 @@ channel_names = [str(name[0]) for name in channel_names]
 # %%
 #plotting the full raw data
 plt.figure(figsize=(10,4), dpi = 200)
-plt.plot(rawdata, alpha=0.4, color='k', label='ENG raw data')
+plt.plot(rawdata, alpha=0.4, color='k', label='EMG raw data')
 plt.xlabel("Time (s)")
 plt.ylabel("Amplitude")
 plt.title("Raw Data")
