@@ -104,7 +104,6 @@ for JOINT_IX in range(num_joints):
             duration = len(resampled_data) / TARGET_SAMPLE_RATE
             t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-            # Plotting the resampled data over time
             plt.plot(t2, resampled_data, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=f' {joint_names[JOINT_IX] } Col {col+1}')
 
     else:
@@ -116,7 +115,6 @@ for JOINT_IX in range(num_joints):
         duration = len(resampled_data) / TARGET_SAMPLE_RATE
         t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-        # Plotting the resampled data over time
         plt.plot(t2, resampled_data, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=joint_names[JOINT_IX])
 
 plt.gca().spines["top"].set_visible(False)
@@ -128,10 +126,6 @@ plt.title(f"Resampled and EMG")
 plt.tight_layout()
 plt.legend()
 plt.show()
-
-
-
-
 
 
 
@@ -150,17 +144,15 @@ for JOINT_IX in range(num_joints):
 
     if joint_data.shape[1] == 2:
         for col in range(2):
-            # Resample the data
+
             filtered_data = apply_butterworth_filter(joint_data[:, col])
             resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
 
             duration = len(resampled_data) / TARGET_SAMPLE_RATE
             t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-            # Ensure the lengths match for plotting
             min_length_resampled = min(len(t2), len(resampled_data))
 
-            # Plotting the resampled data over time
             plt.plot(t2[:min_length_resampled], resampled_data[:min_length_resampled], linestyle='-', color='k', alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]} Col {col+1}')
     else:
         # Resample the data
@@ -170,15 +162,13 @@ for JOINT_IX in range(num_joints):
         duration = len(resampled_data) / TARGET_SAMPLE_RATE
         t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-        # Ensure the lengths match for plotting
         min_length_resampled = min(len(t2), len(resampled_data))
 
-        # Plotting the resampled data over time
         plt.plot(t2[:min_length_resampled], resampled_data[:min_length_resampled], linestyle='-', color='k', alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]}')
 
 # Set plot labels and title
 plt.xlabel('Time (s)')
-plt.ylabel('Kinematic Angle (degrees)')  # Specific label for kinematic angle
+plt.ylabel('Kinematic Angle (degrees)') 
 plt.title('Original and Resampled Kinematic Angles for All Joints')
 plt.legend()
 plt.gca().spines["top"].set_visible(False)
@@ -186,4 +176,164 @@ plt.gca().spines["right"].set_visible(False)
 plt.xlim([0, .5])
 plt.show()
 
+# %%
+#savistsky-golay differentiation
+
+fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+joint_names_1 = kindata['joints_names'].flatten()
+joint_names = [name[0] for name in joint_names_1]
+
+POLYORDER = 5
+WINDOW_LENGTH = 27
+
+for JOINT_IX in range(num_joints):
+    # Access the inner 2D array
+    joint_data = joints[JOINT_IX][0]
+    min_length_original = min(len(time_vector), len(joint_data))
+
+    if joint_data.shape[1] == 2:
+        for col in range(2):
+
+            filtered_data = apply_butterworth_filter(joint_data[:, col])
+            resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+
+            duration = len(resampled_data) / TARGET_SAMPLE_RATE
+            t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+            min_length_resampled = min(len(t2), len(resampled_data))
+
+            if resampled_data.ndim == 1:
+                resampled_data = resampled_data.reshape(-1, 1)
+
+
+            sg = signal.savgol_filter(resampled_data[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
+            angular_velocity = signal.savgol_filter(resampled_data[:, 0],window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2[1] - t2[0])
+            angular_acceleration = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2[1] - t2[0])
+            
+            axs[0].plot(t2[:min_length_resampled], sg[:min_length_resampled], alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]} Col {col+1}')
+            axs[1].plot(t2[:min_length_resampled], angular_velocity[:min_length_resampled], alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]} Col {col+1}')
+            axs[2].plot(t2[:min_length_resampled], angular_acceleration[:min_length_resampled], alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]} Col {col+1}')
+
+   
+    else:
+
+        filtered_data = apply_butterworth_filter(joint_data[:, 0])
+        resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+
+        duration = len(resampled_data) / TARGET_SAMPLE_RATE
+        t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+        min_length_resampled = min(len(t2), len(resampled_data))
+
+        if resampled_data.ndim == 1:
+            resampled_data = resampled_data.reshape(-1, 1)
+
+
+        sg = signal.savgol_filter(resampled_data[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
+        angular_velocity = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2[1] - t2[0])
+        angular_acceleration = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2[1] - t2[0])
+
+
+        axs[0].plot(t2[:min_length_resampled], sg[:min_length_resampled], alpha=0.2, marker='o', label=f'{joint_names[JOINT_IX]} ')
+        axs[1].plot(t2[:min_length_resampled], angular_velocity[:min_length_resampled], alpha=0.2, marker='o', label=f'{joint_names[JOINT_IX]} ')
+        axs[2].plot(t2[:min_length_resampled], angular_acceleration[:min_length_resampled], alpha=0.2, marker='o', label=f'{joint_names[JOINT_IX]} ')
+
+# Set plot labels and title
+axs[0].set_ylabel('Degrees')  
+axs[1].set_ylabel('Degrees/s')  
+axs[2].set_ylabel('Degrees/s^2')  
+
+axs[0].set_title('Angular Position')
+axs[1].set_title('Angular Velocity')
+axs[2].set_title('Angular Acceleration')
+
+axs[1].set_ylim(-2000, 2000)
+axs[2].set_ylim(-100000,100000)
+
+plt.legend()
+
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.xlim([0, 5])
+plt.show()
+
+# %%
+#plotting savistsky-golay differentiation for each joint on indivisual plots
+joint_names_1 = kindata['joints_names'].flatten()
+joint_names = [name[0] for name in joint_names_1]
+
+POLYORDER = 5
+WINDOW_LENGTH = 27
+
+for JOINT_IX in range(num_joints):
+    fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
+    # Access the inner 2D array
+    joint_data = joints[JOINT_IX][0]
+    min_length_original = min(len(time_vector), len(joint_data))
+
+    if joint_data.shape[1] == 2:
+        for col in range(2):
+
+            filtered_data = apply_butterworth_filter(joint_data[:, col])
+            resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+
+            duration = len(resampled_data) / TARGET_SAMPLE_RATE
+            t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+            min_length_resampled = min(len(t2), len(resampled_data))
+
+            if resampled_data.ndim == 1:
+                resampled_data = resampled_data.reshape(-1, 1)
+
+
+            sg = signal.savgol_filter(resampled_data[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
+            angular_velocity = signal.savgol_filter(resampled_data[:, 0],window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2[1] - t2[0])
+            angular_acceleration = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2[1] - t2[0])
+            
+            axs[0].plot(t2[:min_length_resampled], sg[:min_length_resampled], alpha=0.2, marker='o', label=f' {joint_names[JOINT_IX]} ')
+            axs[1].plot(t2[:min_length_resampled], angular_velocity[:min_length_resampled], alpha=0.2, marker='o', label=f' {joint_names[JOINT_IX]} ')
+            axs[2].plot(t2[:min_length_resampled], angular_acceleration[:min_length_resampled], alpha=0.2, marker='o', label=f' {joint_names[JOINT_IX]} ')
+
+   
+    else:
+
+        filtered_data = apply_butterworth_filter(joint_data[:, 0])
+        resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+
+        duration = len(resampled_data) / TARGET_SAMPLE_RATE
+        t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+        min_length_resampled = min(len(t2), len(resampled_data))
+
+        if resampled_data.ndim == 1:
+            resampled_data = resampled_data.reshape(-1, 1)
+
+
+        sg = signal.savgol_filter(resampled_data[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
+        angular_velocity = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2[1] - t2[0])
+        angular_acceleration = signal.savgol_filter(resampled_data[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2[1] - t2[0])
+
+
+        axs[0].plot(t2[:min_length_resampled], sg[:min_length_resampled], alpha=0.2, marker='o', label=f'Resampled {joint_names[JOINT_IX]}')
+        axs[1].plot(t2[:min_length_resampled], angular_velocity[:min_length_resampled], alpha=0.2, marker='o', label=f' {joint_names[JOINT_IX]} ')
+        axs[2].plot(t2[:min_length_resampled], angular_acceleration[:min_length_resampled], alpha=0.2, marker='o', label=f' {joint_names[JOINT_IX]} ')
+
+# Set plot labels and title
+    axs[0].set_ylabel('Degrees')  
+    axs[1].set_ylabel('Degrees/s')  
+    axs[2].set_ylabel('Degrees/s^2')  
+
+    axs[0].set_title('Angular Position')
+    axs[1].set_title('Angular Velocity')
+    axs[2].set_title('Angular Acceleration')
+
+    axs[1].set_ylim(-2000, 2000)
+    axs[2].set_ylim(-100000,100000)
+
+    plt.legend()
+
+    plt.gca().spines["top"].set_visible(False)
+    plt.gca().spines["right"].set_visible(False)
+    plt.xlim([0, 5])
+    plt.show()
 # %%
