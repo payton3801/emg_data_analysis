@@ -177,7 +177,7 @@ plt.xlim([0, .5])
 plt.show()
 
 # %%
-#savistsky-golay differentiation
+#savistsky-golay differentiation on one plot
 
 fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
 joint_names_1 = kindata['joints_names'].flatten()
@@ -242,6 +242,7 @@ for JOINT_IX in range(num_joints):
 axs[0].set_ylabel('Degrees')  
 axs[1].set_ylabel('Degrees/s')  
 axs[2].set_ylabel('Degrees/s^2')  
+axs[2].set_xlabel('Time(s)')
 
 axs[0].set_title('Angular Position')
 axs[1].set_title('Angular Velocity')
@@ -336,4 +337,18 @@ for JOINT_IX in range(num_joints):
     plt.gca().spines["right"].set_visible(False)
     plt.xlim([0, 5])
     plt.show()
+
+# %%
+#making a pandas dataframe
+dataframe = pd.DataFrame(columns = ['Joint', 'Time', 'Position', 'Velocity', 'Acceleration'])
+rows = []
+
+for JOINT_IX in range(num_joints):
+    for i in range(len(t2)):
+        joint_name = joint_names_1[JOINT_IX][0]
+        row = ({'Joint': joint_name, 'Time': t2[i], 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
+        rows.append(row)
+
+dataframe = pd.concat([dataframe, pd.DataFrame(rows)])
+print(dataframe)
 # %%
