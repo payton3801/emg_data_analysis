@@ -344,11 +344,119 @@ dataframe = pd.DataFrame(columns = ['Joint', 'Time', 'Position', 'Velocity', 'Ac
 rows = []
 
 for JOINT_IX in range(num_joints):
-    for i in range(len(t2)):
-        joint_name = joint_names_1[JOINT_IX][0]
-        row = ({'Joint': joint_name, 'Time': t2[i], 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
-        rows.append(row)
+    joint_data= joints[JOINT_IX][0]
+    min_length_original = min(len(time_vector), len(joint_data))
+
+    if joint_data.shape[1] == 2:
+        for col in range(2):
+            filtered_data = apply_butterworth_filter(joint_data[:, col])
+            resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+            duration = len(resampled_data) / TARGET_SAMPLE_RATE
+            t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+            min_length_resampled = min(len(t2), len(resampled_data))
+
+            sg = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER)
+            angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t2[1] - t2[0])
+            angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t2[1] - t2[0])
+
+            for i in range(len(t2)):
+                joint_name = joint_names_1[JOINT_IX][0]
+                row = ({'Time': t2[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
+                rows.append(row)
+
+    else:
+        filtered_data = apply_butterworth_filter(joint_data[:, 0])
+        resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
+        duration = len(resampled_data) / TARGET_SAMPLE_RATE
+        t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+
+        min_length_resampled = min(len(t2), len(resampled_data))
+        sg = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER)
+        angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t2[1] - t2[0])
+        angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t2[1] - t2[0])
+
+        for i in range(len(t2)):
+            joint_name = joint_names_1[JOINT_IX][0]
+            row = ({'Time': t2[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
+            rows.append(row)
 
 dataframe = pd.concat([dataframe, pd.DataFrame(rows)])
-print(dataframe)
+
+dataframe_multi = dataframe.pivot_table( index='Time', columns='Joint', values=['Position', 'Velocity', 'Acceleration'])
+dataframe_multi.columns = pd.MultiIndex.from_tuples(dataframe_multi.columns)
+
+dataframe_multi.reset_index(inplace=True)
+
+#dataframe = dataframe.sort_values(by='Time')
+#dataframe.set_index('Time', inplace=True)
+
+# %%
+#Adding stance/swing column
+velocity_threshold = 10
+acceleration_threshold = 10
+
+stance_conditions = []
+for joint in dataframe_multi['Velocity'].columns:
+    # Calculate stance condition for each joint separately
+    stance_condition_joint = (np.abs(dataframe_multi['Velocity'][joint]) < velocity_threshold) & (np.abs(dataframe_multi['Acceleration'][joint]) < acceleration_threshold)
+    stance_conditions.append(stance_condition_joint)
+
+# Combine the stance conditions correctly
+combined_stance = np.all(stance_conditions, axis=0)
+
+# Assign the combined stance condition to the 'Phase' column as a 1D array
+dataframe_multi['Phase'] = np.where(combined_stance, 'Stance', 'Swing')
+
+# Show the filtered DataFrame
+print(dataframe_multi)
+
+
+# %%
+#toe kinematics position trace over time, with stance and swing roughly colored
+toeposition= dataframe_multi['Position']['mtp']
+ankleposition = dataframe_multi['Position']['ankle']
+time = dataframe_multi['Time']
+
+ratio = np.abs(np.diff(toeposition)/ np.diff(time))
+threshold = np.percentile(ratio, 90)
+swingposition = np.where(ratio > threshold)[0]
+
+plt.plot(time, toeposition, color='black')
+
+for i in range(1, len(swingposition)):
+    plt.plot(time[swingposition[i-1]:swingposition[i]], toeposition[swingposition[i-1]:swingposition[i]], color='red')
+
+plt.xlabel('Time (s)')
+plt.ylabel('Toe positions (degrees)') 
+plt.title('Toe positions over time')
+plt.legend()
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.xlim([0, 5])
+plt.ylim([130, 210])
+plt.show()
+
+# %%
+#toe kinematics over time with peaks and troughs identified
+
+peaks, _ = signal.find_peaks(toeposition, prominence=50)
+troughs, _ = signal.find_peaks(-toeposition, prominence=50)
+
+
+plt.plot (time, toeposition)
+
+plt.plot (time[peaks], toeposition[peaks], 'ro')
+plt.plot (time[troughs], toeposition[troughs], 'ro')
+
+
+plt.xlabel('Time (s)')
+plt.ylabel('Toe positions (degrees)') 
+plt.title('Toe positions over time')
+plt.legend()
+plt.gca().spines["top"].set_visible(False)
+plt.gca().spines["right"].set_visible(False)
+plt.xlim([0, 5])
+plt.ylim([130, 210])
+plt.show()
 # %%
