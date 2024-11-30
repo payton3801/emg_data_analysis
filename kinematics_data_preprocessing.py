@@ -392,30 +392,11 @@ dataframe_multi.reset_index(inplace=True)
 #dataframe.set_index('Time', inplace=True)
 
 # %%
-#Adding stance/swing column
-velocity_threshold = 10
-acceleration_threshold = 10
-
-stance_conditions = []
-for joint in dataframe_multi['Velocity'].columns:
-    # Calculate stance condition for each joint separately
-    stance_condition_joint = (np.abs(dataframe_multi['Velocity'][joint]) < velocity_threshold) & (np.abs(dataframe_multi['Acceleration'][joint]) < acceleration_threshold)
-    stance_conditions.append(stance_condition_joint)
-
-# Combine the stance conditions correctly
-combined_stance = np.all(stance_conditions, axis=0)
-
-# Assign the combined stance condition to the 'Phase' column as a 1D array
-dataframe_multi['Phase'] = np.where(combined_stance, 'Stance', 'Swing')
-
-# Show the filtered DataFrame
-print(dataframe_multi)
-
 
 # %%
-#toe kinematics position trace over time, with stance and swing roughly colored
+#toe kinematics position trace over time, using  change in slope as a metric
+#wrong
 toeposition= dataframe_multi['Position']['mtp']
-ankleposition = dataframe_multi['Position']['ankle']
 time = dataframe_multi['Time']
 
 ratio = np.abs(np.diff(toeposition)/ np.diff(time))
@@ -444,19 +425,25 @@ peaks, _ = signal.find_peaks(toeposition, prominence=50)
 troughs, _ = signal.find_peaks(-toeposition, prominence=50)
 
 
-plt.plot (time, toeposition)
+plt.plot (time, toeposition, color='black')
 
-plt.plot (time[peaks], toeposition[peaks], 'ro')
-plt.plot (time[troughs], toeposition[troughs], 'ro')
+#plt.plot (time[peaks], toeposition[peaks], 'ko')
+#plt.plot (time[troughs], toeposition[troughs], 'ko')
+
+for i in range(len(troughs)): #less than the length of peaks
+    plt.plot(time[peaks[i]:troughs[i]+1], toeposition[peaks[i]:troughs[i]+1], color='red')
 
 
 plt.xlabel('Time (s)')
 plt.ylabel('Toe positions (degrees)') 
 plt.title('Toe positions over time')
-plt.legend()
 plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.xlim([0, 5])
 plt.ylim([130, 210])
 plt.show()
+
+# %%
+
+
 # %%
