@@ -15,8 +15,53 @@ filterdata = emgdata['emg_full_fil']
 #         print(f"\nKey: {key}")
 #         print(f"Type: {type(emgdata[key])}")
 #         print(f"Shape: {emgdata[key].shape}")
+time_vector = emgdata['t_emg']
+intervals = np.diff(time_vector)
+EMG_SAMPLE_RATE = 1/np.mean(intervals) 
+bandwidth = 2
+notch_frequencies= [60, 120, 240, 300, 420]
+channel_names = emgdata['emg_names'].flatten()
+channel_names = emgdata['emg_names'][0]
+channel_names = [str(name[0]) for name in channel_names]
+
+#general parameters
+NFFT = 50000 #Use sampling rate/NFFT = 0.1
+NPERSEG = 50000
+NOVERLAP = 10000 #Use .2 (NFFT) = NOVERLAP
+CHAN_IX = 5
+num_channels = rawdata.shape[1]
+
 
 plt.rcParams['agg.path.chunksize'] = 10000
+
+# %%
+def apply_notch_filter(x, notch_frequencies, bandwidth, sample_rate):
+    """ 
+        apply notch filter(s) to a designated channel
+        notch_frequencies = desired frequencies to be filtered out (Hz)
+        x = signal data being filtered
+        bandwidth = bandwidth of notch filter (Hz)
+        sample_rate = sampling rate of the signal (Hz)
+    """
+
+    Q = [freq / bandwidth for freq in notch_frequencies]  # Compute Q for each frequency
+    for freq, q in zip(notch_frequencies, Q):
+        w0 = freq/ (sample_rate/2) #to normalize the frequency, convert to a value btwn 0 and 1
+        b, a = signal.iirnotch(w0, q, SAMPLE_RATE)
+        x = signal.filtfilt(b, a, x)
+
+    return x
+
+def apply_butterworth_filter_emg(x):
+    """
+        apply 4th order butterworth high pass filter with cutoff at 65 Hz
+        x = signal data being filtered
+    """
+
+    b, a = signal.butter(4, 65.0, btype='high', analog=False, fs=SAMPLE_RATE)
+    butterworth = signal.filtfilt(b, a, x)
+    return butterworth
+
 # %%
 kindata = loadmat('J10_s20_i0_pref.mat')
 
@@ -45,7 +90,7 @@ MARKER_IX = 1
 
 # %%
 #low pass filtering the data 
-def apply_butterworth_filter(x, sample_rate=SAMPLE_RATE, cutoff=40.0, order=4, padlen = 150):
+def apply_butterworth_filter_kin(x, sample_rate=SAMPLE_RATE, cutoff=40.0, order=4, padlen = 150):
     """
         apply 4th order butterworth low pass filter with cutoff at 40 Hz
         x = signal data being filtered
@@ -68,13 +113,13 @@ for JOINT_IX in range(num_joints):
     if joint_data.shape[1] == 2:
         for col in range(2):
             
-            applied_butter = apply_butterworth_filter(joint_data[:, col], SAMPLE_RATE)
+            applied_butter = apply_butterworth_filter_kin(joint_data[:, col], SAMPLE_RATE)
 
             plt.plot(time_vector, applied_butter, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=joint_names[JOINT_IX])
 
     else:
 
-        applied_butter = apply_butterworth_filter(joint_data[:, 0])
+        applied_butter = apply_butterworth_filter_kin(joint_data[:, 0])
 
         plt.plot(time_vector, applied_butter, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=joint_names[JOINT_IX])
 
@@ -88,7 +133,7 @@ plt.show()
 
 # %%
 #low pass filtering the data -> markers
-def apply_butterworth_filter(x, sample_rate=SAMPLE_RATE, cutoff=40.0, order=4):
+def apply_butterworth_filter_kin(x, sample_rate=SAMPLE_RATE, cutoff=40.0, order=4):
     """
         apply 4th order butterworth low pass filter with cutoff at 40 Hz
         x = signal data being filtered
@@ -107,8 +152,8 @@ for MARKER_IX in range(num_markers):
     marker_y = marker_data[:,1]
 
             
-    applied_butter_marker_x = apply_butterworth_filter(marker_x, SAMPLE_RATE)
-    applied_butter_marker_y = apply_butterworth_filter(marker_y, SAMPLE_RATE)
+    applied_butter_marker_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
+    applied_butter_marker_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
 
     axs[0].plot(time_vector, applied_butter_marker_x-marker_x, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=marker_names[MARKER_IX])
     axs[1].plot(time_vector, applied_butter_marker_y-marker_y, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=marker_names[MARKER_IX])
@@ -153,9 +198,9 @@ for MARKER_IX in range(num_markers):
     marker_y = marker_data[:, 1]
 
 
-    filtered_data_x = apply_butterworth_filter(marker_x, SAMPLE_RATE)
+    filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
     resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down= DOWNSAMPLING) 
-    filtered_data_y = apply_butterworth_filter(marker_y, SAMPLE_RATE)
+    filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
     resampled_data_y = signal.resample_poly(filtered_data_y, up=UPSAMPLING, down= DOWNSAMPLING) 
 
 
@@ -204,9 +249,9 @@ for MARKER_IX in range(num_markers):
     marker_x = marker_data[:, 0]
     marker_y = marker_data[:, 1]
 
-    filtered_data_x = apply_butterworth_filter(marker_x, SAMPLE_RATE)
+    filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
     resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down= DOWNSAMPLING) 
-    filtered_data_y = apply_butterworth_filter(marker_y, SAMPLE_RATE)
+    filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
     resampled_data_y = signal.resample_poly(filtered_data_y, up=UPSAMPLING, down= DOWNSAMPLING) 
 
     duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
@@ -282,9 +327,9 @@ for MARKER_IX in range(num_markers):
     marker_x = marker_data[:, 0]
     marker_y = marker_data[:, 1]
 
-    filtered_data_x = apply_butterworth_filter(marker_x, SAMPLE_RATE)
+    filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
     resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down= DOWNSAMPLING) 
-    filtered_data_y = apply_butterworth_filter(marker_y, SAMPLE_RATE)
+    filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
     resampled_data_y = signal.resample_poly(filtered_data_y, up=UPSAMPLING, down= DOWNSAMPLING) 
 
     duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
@@ -368,7 +413,7 @@ for JOINT_IX in range(num_joints):
     if joint_data.shape[1] == 2:
         for col in range(2):
 
-            filtered_data = apply_butterworth_filter(joint_data[:, col])
+            filtered_data = apply_butterworth_filter_kin(joint_data[:, col])
             resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
 
             duration = len(resampled_data) / TARGET_SAMPLE_RATE
@@ -391,7 +436,7 @@ for JOINT_IX in range(num_joints):
    
     else:
 
-        filtered_data = apply_butterworth_filter(joint_data[:, 0])
+        filtered_data = apply_butterworth_filter_kin(joint_data[:, 0])
         resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
 
         duration = len(resampled_data) / TARGET_SAMPLE_RATE
@@ -443,7 +488,7 @@ for JOINT_IX in range(num_joints):
 
     if joint_data.shape[1] == 2:
         for col in range(2):
-            filtered_data = apply_butterworth_filter(joint_data[:, col])
+            filtered_data = apply_butterworth_filter_kin(joint_data[:, col])
             resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
             duration = len(resampled_data) / TARGET_SAMPLE_RATE
             t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
@@ -460,7 +505,7 @@ for JOINT_IX in range(num_joints):
                 rows.append(row)
 
     else:
-        filtered_data = apply_butterworth_filter(joint_data[:, 0])
+        filtered_data = apply_butterworth_filter_kin(joint_data[:, 0])
         resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
         duration = len(resampled_data) / TARGET_SAMPLE_RATE
         t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
@@ -496,13 +541,12 @@ for MARKER_IX in range(num_markers):
     marker_data = markers[MARKER_IX][0]
     min_length_original = min(len(time_vector), len(marker_data))
 
-    # Assuming marker_x and marker_y are defined as parts of marker_data
     marker_x = marker_data[:, 0]
     marker_y = marker_data[:, 1]
 
-    filtered_data_x = apply_butterworth_filter(marker_x, SAMPLE_RATE)
+    filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
     resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down=DOWNSAMPLING)
-    filtered_data_y = apply_butterworth_filter(marker_y, SAMPLE_RATE)
+    filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
     resampled_data_y = signal.resample_poly(filtered_data_y, up=UPSAMPLING, down=DOWNSAMPLING)
 
     duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
@@ -637,14 +681,84 @@ step_data = {'step_id': [], 'stance_starttime': [], 'stance_endtime': [], 'swing
 
 for i in range(len(troughs)-1):
     step_data['step_id'].append(i)
-    step_data['stance_starttime'].append([start_crossings[i]])
-    step_data['stance_endtime'].append([end_crossings[i]])
-    step_data['swing_starttime'].append([end_crossings[i]])
+    step_data['stance_starttime'].append(start_crossings[i])
+    step_data['stance_endtime'].append(end_crossings[i])
+    step_data['swing_starttime'].append(end_crossings[i])
     step_data['swing_endtime'].append(start_crossings[i + 1])
 
 dataframe_step = pd.DataFrame(step_data)
 dataframe_step.set_index('step_id', inplace=True)
 
+dataframe_step = dataframe_step.pivot_table(index='step_id', values=['stance_starttime', 'stance_endtime', 'swing_starttime', 'swing_endtime'])
+dataframe_step.columns = pd.MultiIndex.from_product([['Swing/Stance'], dataframe_step.columns.tolist()])
+dataframe_step.reset_index(inplace=True)
+
 print(dataframe_step)
 
 # %%
+finalized_data = []
+for CHAN_IX in range(num_channels):
+    if CHAN_IX == 6:
+        continue
+    applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter = apply_butterworth_filter_emg(applied_notch)
+    rectifieddata = np.abs(applied_butter)
+    
+    # Resample the data
+    EMG_SAMPLE_RATE = round(EMG_SAMPLE_RATE)
+    TARGET_SAMPLE_RATE = 500
+    DOWNSAMPLING = EMG_SAMPLE_RATE // TARGET_SAMPLE_RATE
+    resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data = np.abs(clipped_data)
+
+    # Quartile clipping the data
+    quartiled_data_95 = np.quantile(clipped_data, .95)
+    duration = len(resampled_data) / TARGET_SAMPLE_RATE
+    t = np.linspace(0, duration, len(resampled_data), endpoint=False)
+    normalized_data = clipped_data / quartiled_data_95
+    normalized_data=np.abs(normalized_data)
+
+    for i in range(len(t2)):
+        finalized_data.append({
+            'Time': t[i],
+            'Channel': channel_names[CHAN_IX],
+            'Finalized Data': normalized_data[i]
+        })
+
+dataframe_emg = pd.DataFrame(finalized_data)
+dataframe_emg = dataframe_emg.pivot_table(index='Time', columns='Channel', values='Finalized Data')
+dataframe_emg.columns = pd.MultiIndex.from_product([['EMG Marker Position'], dataframe_emg.columns.tolist()])
+dataframe_emg.reset_index(inplace=True)
+print(dataframe_emg)
+
+
+# %%
+result = pd.concat([dataframe_multi_markers, dataframe_emg], axis=1)
+
+print(result)
+
+# %% converting to snel-toolkit time windows
+
+time_data = np.linspace(0, 106.568, num=53285) 
+
+start_time = pd.Timestamp('2023-01-01')
+time_points = start_time + pd.to_timedelta(time_data, unit='s')
+
+formatted_time_points = time_points.strftime('%d %H:%M:%S')
+
+# Create a DataFrame with the formatted time points and some example data
+data = np.random.randn(len(time_data), 5)  
+
+# Check if 'Time' column already exists
+if 'Time' in result.columns:
+    result.drop(columns=['Time'], inplace=True)
+
+# Insert the formatted time points as the first column
+result.insert(0, 'Time', formatted_time_points)
+
+print(result)
+
+# %%
+

@@ -521,4 +521,5 @@ for CHAN_IX in range(num_channels):
 dataframe_emg = pd.DataFrame(finalized_data)
 dataframe_emg.set_index(['Time'], inplace=True)
 print(dataframe_emg)
+
 # %%
