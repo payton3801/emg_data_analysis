@@ -45,7 +45,7 @@ channel_names = [str(name[0]) for name in channel_names]
 # %%
 #plotting the full raw data
 plt.figure(figsize=(10,4), dpi = 200)
-plt.plot(rawdata, alpha=0.4, color='k', label='ENG raw data')
+plt.plot(rawdata, alpha=0.4, color='k', label='EMG raw data')
 plt.xlabel("Time (s)")
 plt.ylabel("Amplitude")
 plt.title("Raw Data")
@@ -484,5 +484,42 @@ plt.tight_layout()
 plt.yticks([])
 plt.legend()
 plt.show()
+
+# %%
+#making a dataframe of finalized emg data
+finalized_data = []
+for CHAN_IX in range(num_channels):
+    if CHAN_IX == 6:
+        continue
+    applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter = apply_butterworth_filter(applied_notch)
+    rectifieddata = np.abs(applied_butter)
+    
+    # Resample the data
+    SAMPLE_RATE = round(SAMPLE_RATE)
+    TARGET_SAMPLE_RATE = 500
+    DOWNSAMPLING = SAMPLE_RATE // TARGET_SAMPLE_RATE
+    resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data = np.abs(clipped_data)
+
+    # Quartile clipping the data
+    quartiled_data_95 = np.quantile(clipped_data, .95)
+    duration = len(resampled_data) / TARGET_SAMPLE_RATE
+    t = np.linspace(0, duration, len(resampled_data), endpoint=False)
+    normalized_data = clipped_data / quartiled_data_95
+    normalized_data=np.abs(normalized_data)
+
+    for i in range(len(t2)):
+        finalized_data.append({
+            'Time': t[i],
+            'Channel': channel_names[CHAN_IX],
+            'Finalized Data': normalized_data[i]
+        })
+
+dataframe_emg = pd.DataFrame(finalized_data)
+dataframe_emg.set_index(['Time'], inplace=True)
+print(dataframe_emg)
 
 # %%
