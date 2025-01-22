@@ -97,13 +97,11 @@ for JOINT_IX in range(num_joints):
         for col in range(2):
             
             applied_butter = apply_butterworth_filter_kin(joint_data[:, col], SAMPLE_RATE)
-
             plt.plot(time_vector_kin, applied_butter, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=joint_names[JOINT_IX])
 
     else:
 
         applied_butter = apply_butterworth_filter_kin(joint_data[:, 0])
-
         plt.plot(time_vector_kin, applied_butter, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=joint_names[JOINT_IX])
 
 plt.xlabel('Time (s)') 
@@ -163,14 +161,14 @@ for MARKER_IX in range(num_markers):
     duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
     duration_y = len(resampled_data_y) / TARGET_SAMPLE_RATE
 
-    t2_x = np.linspace(0, duration_x, len(resampled_data_x), endpoint=False)
-    t2_y = np.linspace(0, duration_y, len(resampled_data_y), endpoint=False)
+    t2_marker_x = np.linspace(0, duration_x, len(resampled_data_x), endpoint=False)
+    t2_marker_y = np.linspace(0, duration_y, len(resampled_data_y), endpoint=False)
 
-    axs[0].plot(t2_x, resampled_data_x, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
+    axs[0].plot(t2_marker_x, resampled_data_x, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
     #axs[0].plot(time_vector, marker_x, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
     #uncomment to plot overlaid before/after filtering and resampling
 
-    axs[1].plot(t2_y, resampled_data_y, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
+    axs[1].plot(t2_marker_y, resampled_data_y, alpha=0.7, marker= 'o', color = colors[MARKER_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
     #axs[1].plot(time_vector, marker_y, alpha=0.7, marker= 'o', color = colors[JOINT_IX], markersize=3, label=f' {marker_names[MARKER_IX] } ')
 
 
@@ -186,81 +184,6 @@ axs[1].set_title('Filtered Marker and Resampled Position Y Over Time')
 axs[1].legend()
 axs[1].set_xlim(0, 5)
 
-plt.tight_layout()
-plt.show()
-
-# %% -- savistsky-golay differentiation for all markers in x, y, and z planes on one plot
-fig, axs = plt.subplots(6, 1, figsize=(10, 8), sharex=True)
-
-POLYORDER = 5
-WINDOW_LENGTH = 27
-
-for MARKER_IX in range(num_markers):
-    marker_data = markers[MARKER_IX][0]
-    marker_x = marker_data[:, 0]
-    marker_y = marker_data[:, 1]
-
-    filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
-    resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down= DOWNSAMPLING) 
-    filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
-    resampled_data_y = signal.resample_poly(filtered_data_y, up=UPSAMPLING, down= DOWNSAMPLING) 
-
-    duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
-    duration_y = len(resampled_data_y) / TARGET_SAMPLE_RATE
-
-    t2_x = np.linspace(0, duration_x, len(resampled_data_x), endpoint=False)
-    t2_y = np.linspace(0, duration_y, len(resampled_data_y), endpoint=False)
-
-    min_length_resampled_x = min(len(t2_x), len(resampled_data_x))
-    min_length_resampled_y = min(len(t2_y), len(resampled_data_y))
-
-
-    if resampled_data_x.ndim == 1:
-        resampled_data_x = resampled_data_x.reshape(-1, 1)
-    if resampled_data_y.ndim == 1:
-        resampled_data_y = resampled_data_y.reshape(-1, 1)
-
-
-    sg_x = signal.savgol_filter(resampled_data_x[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
-    sg_y = signal.savgol_filter(resampled_data_y[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
-
-    angular_velocity_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_x[1] - t2_x[0])
-    angular_velocity_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_y[1] - t2_y[0])
-
-    angular_acceleration_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_x[1] - t2_x[0])
-    angular_acceleration_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_y[1] - t2_y[0])
-
-
-    axs[0].plot(t2_x[:min_length_resampled_x], sg_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[1].plot(t2_x[:min_length_resampled_x], angular_velocity_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize = 1, label=f'{marker_names[MARKER_IX]} ')
-    axs[2].plot(t2_x[:min_length_resampled_x], angular_acceleration_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[3].plot(t2_y[:min_length_resampled_y], sg_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[4].plot(t2_y[:min_length_resampled_y], angular_velocity_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[5].plot(t2_y[:min_length_resampled_y], angular_acceleration_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-
-# Set plot labels and title
-    axs[0].set_ylabel('Degrees')  
-    axs[1].set_ylabel('Degrees/s')  
-    axs[2].set_ylabel('Degrees/s^2')  
-    axs[3].set_ylabel('Degrees')  
-    axs[4].set_ylabel('Degrees/s')  
-    axs[5].set_ylabel('Degrees/s^2')  
-
-    axs[0].set_title('Angular Position X')
-    axs[1].set_title('Angular Velocity Y')
-    axs[2].set_title('Angular Acceleration Z')
-    axs[3].set_title('Angular Position X')
-    axs[4].set_title('Angular Velocity Y')
-    axs[5].set_title('Angular Acceleration Z')
-
-axs[1].set_ylim(-2000, 2000)
-axs[2].set_ylim(-100000,100000)
-
-plt.legend()
-
-plt.gca().spines["top"].set_visible(False)
-plt.gca().spines["right"].set_visible(False)
-plt.xlim([0, 5])
 plt.tight_layout()
 plt.show()
 
@@ -282,11 +205,11 @@ for MARKER_IX in range(num_markers):
     duration_x = len(resampled_data_x) / TARGET_SAMPLE_RATE
     duration_y = len(resampled_data_y) / TARGET_SAMPLE_RATE
 
-    t2_x = np.linspace(0, duration_x, len(resampled_data_x), endpoint=False)
-    t2_y = np.linspace(0, duration_y, len(resampled_data_y), endpoint=False)
+    t2_marker_x = np.linspace(0, duration_x, len(resampled_data_x), endpoint=False)
+    t2_marker_y = np.linspace(0, duration_y, len(resampled_data_y), endpoint=False)
 
-    min_length_resampled_x = min(len(t2_x), len(resampled_data_x))
-    min_length_resampled_y = min(len(t2_y), len(resampled_data_y))
+    min_length_resampled_x = min(len(t2_marker_x), len(resampled_data_x))
+    min_length_resampled_y = min(len(t2_marker_y), len(resampled_data_y))
 
     if resampled_data_x.ndim == 1:
         resampled_data_x = resampled_data_x.reshape(-1, 1)
@@ -297,19 +220,19 @@ for MARKER_IX in range(num_markers):
     sg_x = signal.savgol_filter(resampled_data_x[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
     sg_y = signal.savgol_filter(resampled_data_y[:,0], window_length=WINDOW_LENGTH, polyorder= POLYORDER)
 
-    angular_velocity_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_x[1] - t2_x[0])
-    angular_velocity_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_y[1] - t2_y[0])
+    angular_velocity_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_marker_x[1] - t2_marker_x[0])
+    angular_velocity_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=1, delta=t2_marker_y[1] - t2_marker_y[0])
 
-    angular_acceleration_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_x[1] - t2_x[0])
-    angular_acceleration_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_y[1] - t2_y[0])
+    angular_acceleration_x = signal.savgol_filter(resampled_data_x[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_marker_x[1] - t2_marker_x[0])
+    angular_acceleration_y = signal.savgol_filter(resampled_data_y[:, 0], window_length=WINDOW_LENGTH, polyorder= POLYORDER, deriv=2, delta=t2_marker_y[1] - t2_marker_y[0])
 
 
-    axs[0].plot(t2_x[:min_length_resampled_x], sg_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[1].plot(t2_x[:min_length_resampled_x], angular_velocity_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize = 1, label=f'{marker_names[MARKER_IX]} ')
-    axs[2].plot(t2_x[:min_length_resampled_x], angular_acceleration_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[3].plot(t2_y[:min_length_resampled_y], sg_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[4].plot(t2_y[:min_length_resampled_y], angular_velocity_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
-    axs[5].plot(t2_y[:min_length_resampled_y], angular_acceleration_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
+    axs[0].plot(t2_marker_x[:min_length_resampled_x], sg_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
+    axs[1].plot(t2_marker_x[:min_length_resampled_x], angular_velocity_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize = 1, label=f'{marker_names[MARKER_IX]} ')
+    axs[2].plot(t2_marker_x[:min_length_resampled_x], angular_acceleration_x[:min_length_resampled_x], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
+    axs[3].plot(t2_marker_y[:min_length_resampled_y], sg_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
+    axs[4].plot(t2_marker_y[:min_length_resampled_y], angular_velocity_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
+    axs[5].plot(t2_marker_y[:min_length_resampled_y], angular_acceleration_y[:min_length_resampled_y], alpha=0.2, marker='o', markersize=1, label=f'{marker_names[MARKER_IX]} ')
 
 # Set plot labels and title
     axs[0].set_ylabel('Degrees')  
@@ -423,42 +346,42 @@ for JOINT_IX in range(num_joints):
             filtered_data = apply_butterworth_filter_kin(joint_data[:, col])
             resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
             duration = len(resampled_data) / TARGET_SAMPLE_RATE
-            t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+            t_joint = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-            min_length_resampled = min(len(t2), len(resampled_data))
+            min_length_resampled = min(len(t_joint), len(resampled_data))
 
             sg = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER)
-            angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t2[1] - t2[0])
-            angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t2[1] - t2[0])
+            angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t_joint[1] - t_joint[0])
+            angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t_joint[1] - t_joint[0])
 
-            for i in range(len(t2)):
+            for i in range(len(t_joint)):
                 joint_name = joint_names_1[JOINT_IX][0]
-                row = ({'Time': t2[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
+                row = ({'Time': t_joint[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
                 rows.append(row)
 
     else:
         filtered_data = apply_butterworth_filter_kin(joint_data[:, 0])
         resampled_data = signal.resample_poly(filtered_data, up=UPSAMPLING, down=DOWNSAMPLING)
         duration = len(resampled_data) / TARGET_SAMPLE_RATE
-        t2 = np.linspace(0, duration, len(resampled_data), endpoint=False)
+        t_joint = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-        min_length_resampled = min(len(t2), len(resampled_data))
+        min_length_resampled = min(len(t_joint), len(resampled_data))
         sg = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER)
-        angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t2[1] - t2[0])
-        angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t2[1] - t2[0])
+        angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t_joint[1] - t_joint[0])
+        angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t_joint[1] - t_joint[0])
 
         for i in range(len(t2)):
             joint_name = joint_names_1[JOINT_IX][0]
-            row = ({'Time': t2[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
+            row = ({'Time': t_joint[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
             rows.append(row)
 
 dataframe = pd.concat([dataframe, pd.DataFrame(rows)])
 
-dataframe_multi = dataframe.pivot_table( index='Time', columns='Joint', values=['Position', 'Velocity', 'Acceleration'])
-dataframe_multi.columns = pd.MultiIndex.from_tuples(dataframe_multi.columns)
+dataframe_joint = dataframe.pivot_table( index='Time', columns='Joint', values=['Position', 'Velocity', 'Acceleration'])
+dataframe_joint.columns = pd.MultiIndex.from_tuples(dataframe_joint.columns)
 
-dataframe_multi.reset_index(inplace=True)
-print(dataframe_multi)
+dataframe_joint.reset_index(inplace=True)
+print(dataframe_joint)
 
 #dataframe = dataframe.sort_values(by='Time')
 #dataframe.set_index('Time', inplace=True)
@@ -473,7 +396,7 @@ for MARKER_IX in range(num_markers):
     for i in range(min_length_resampled_x):
         joint_name = joint_names_1[JOINT_IX][0]
         row = {
-            'Time': t2_x[i],
+            'Time': t2_marker_x[i],
             'Marker': f'{marker_name}_x',
             'Position': sg_x[i],
             'Velocity': angular_velocity_x[i],
@@ -484,7 +407,7 @@ for MARKER_IX in range(num_markers):
     for i in range(min_length_resampled_y):
         joint_name = joint_names_1[JOINT_IX][0]
         row = {
-            'Time': t2_y[i],
+            'Time': t2_marker_y[i],
             'Marker': f'{marker_name}_y',
             'Position': sg_y[i],
             'Velocity': angular_velocity_y[i],
@@ -502,7 +425,7 @@ print(dataframe_multi_markers)
 
 # %% -- defining toe velocity and time from dataframe
 toevelocity = dataframe_multi_markers['Velocity']['toe_y']
-time = dataframe_multi['Time']
+time = dataframe_joint['Time']
 
 # %% -- full scale plot of toevelocities, area around stance identified
 #toe kinematics over time with peaks and troughs identified
@@ -617,30 +540,30 @@ finalized_data = []
 for CHAN_IX in range(num_channels):
     #if CHAN_IX == 6:
         #continue
-    applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
-    applied_butter = apply_butterworth_filter_emg(applied_notch)
-    rectifieddata = np.abs(applied_butter)
+    applied_notch_emg = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter_emg = apply_butterworth_filter_emg(applied_notch_emg)
+    rectifieddata_emg = np.abs(applied_butter)
     
     # Resample the data
     EMG_SAMPLE_RATE = round(EMG_SAMPLE_RATE)
     TARGET_SAMPLE_RATE = 500
-    DOWNSAMPLING = EMG_SAMPLE_RATE // TARGET_SAMPLE_RATE
-    resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+    DOWNSAMPLING_EMG = EMG_SAMPLE_RATE // TARGET_SAMPLE_RATE
+    resampled_data_emg = signal.resample_poly(rectifieddata_emg, down=DOWNSAMPLING, up=1)
     quartiled_data_999 = np.quantile(resampled_data, .999)
-    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
-    clipped_data = np.abs(clipped_data)
+    clipped_data_emg = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data_emg = np.abs(clipped_data_emg)
 
     # Quartile clipping the data
-    quartiled_data_95 = np.quantile(clipped_data, .95)
-    #duration = len(resampled_data) / TARGET_SAMPLE_RATE
-    t = np.arange(len(resampled_data))/ TARGET_SAMPLE_RATE
+    quartiled_data_95_emg = np.quantile(clipped_data_emg, .95)
+    duration_emg = len(resampled_data) / TARGET_SAMPLE_RATE
+    t_emg = np.linspace(0, duration, len(resampled_data), endpoint=False)
 
-    normalized_data = clipped_data / quartiled_data_95
-    normalized_data=np.abs(normalized_data)
+    normalized_data = clipped_data_emg / quartiled_data_95_emg
+    normalized_data = np.abs(normalized_data)
 
-    for i in range(len(t)):
+    for i in range(len(t_emg)):
         finalized_data.append({
-            'Time': t[i],
+            'Time': t_emg[i],
             'Channel': channel_names[CHAN_IX],
             'Finalized Data': normalized_data[i]
         })
@@ -651,8 +574,9 @@ dataframe_emg.columns = pd.MultiIndex.from_product([['EMG'], dataframe_emg.colum
 print(dataframe_emg)
 
 # %% -- concatenating the dataframes
-result = pd.concat([dataframe_multi_markers, dataframe_emg], axis=1)
-print(result)
+dataframe_result = pd.concat([dataframe_multi_markers, dataframe_emg], axis=1)
+
+print(dataframe_result)
 
 # %% -- making the psths, all plots and black lines are average
 
@@ -691,6 +615,7 @@ for idx, channel in enumerate(channel_names):
 
 plt.tight_layout()
 plt.show()
+
 
 # %%
 

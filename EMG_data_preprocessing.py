@@ -233,7 +233,6 @@ for CHAN_IX in range(num_channels):
     # Time vector for plotting
     t = np.linspace(0, len(rectifieddata) / SAMPLE_RATE, len(rectifieddata), endpoint=False)
 
-
     # Plotting the resampled data over time
     plt.figure(figsize=(10, 4), dpi=200)
     plt.plot(t, rectifieddata, 'r--', color='k', alpha=0.7, marker='o', markersize=3, label='Original Data')
