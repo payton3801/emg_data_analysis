@@ -519,7 +519,10 @@ for CHAN_IX in range(num_channels):
         })
 
 dataframe_emg = pd.DataFrame(finalized_data)
-dataframe_emg.set_index(['Time'], inplace=True)
+dataframe_emg['Time'] = pd.to_timedelta(dataframe_emg['Time'], unit = 's')
+dataframe_emg.index = pd.to_timedelta(dataframe_emg.index)
+
+
 print(dataframe_emg)
 
 # %%
