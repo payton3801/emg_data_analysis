@@ -419,7 +419,6 @@ dataframe_markers = pd.DataFrame(rows)
 
 # Pivot the DataFrame to create a multi-index DataFrame
 dataframe_multi_markers = dataframe_markers.pivot_table(index='Time', columns='Marker', values=['Position', 'Velocity', 'Acceleration'])
-
 dataframe_multi_markers.reset_index(inplace=True)
 print(dataframe_multi_markers)
 
@@ -574,11 +573,26 @@ dataframe_emg.columns = pd.MultiIndex.from_product([['EMG'], dataframe_emg.colum
 print(dataframe_emg)
 
 # %% -- concatenating the dataframes
-dataframe_result = pd.concat([dataframe_multi_markers, dataframe_emg], axis=1)
+if 'Time' not in dataframe_multi_markers.columns:
+    dataframe_multi_markers.reset_index(inplace=True)
+if 'Time' not in dataframe_emg.columns:
+    dataframe_emg.reset_index(inplace=True)
+if 'Time' not in dataframe_joint.columns:
+    dataframe_joint.reset_index(inplace=True)
 
-print(dataframe_result)
+dataframe_multi_markers['Time'] = pd.to_timedelta(dataframe_multi_markers['Time'], unit='s')
+dataframe_joint['Time'] = pd.to_timedelta(dataframe_joint['Time'], unit='s')
+dataframe_emg['Time'] = pd.to_timedelta(dataframe_emg['Time'], unit='s')
 
-# %% -- making the psths, all plots and black lines are average
+# Set 'Time' as the index for each dataframe
+dataframe_multi_markers.set_index('Time', inplace=True)
+dataframe_emg.set_index('Time', inplace=True)
+dataframe_joint.set_index('Time', inplace=True)
+
+# Concatenate the dataframes
+dataframe_all = pd.concat([dataframe_multi_markers, dataframe_emg, dataframe_joint], axis=1)
+print(dataframe_all)
+# %% -- making the time locked averaging
 
 window_size = 2
 bins = np.arange(-window_size, window_size, .01)
@@ -615,6 +629,7 @@ for idx, channel in enumerate(channel_names):
 
 plt.tight_layout()
 plt.show()
+
 
 
 # %%
