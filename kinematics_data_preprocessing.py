@@ -4,7 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scipy.signal as signal
 from scipy.io import loadmat
-import math
+import seaborn as sns
+
 
 # %% -- loading in data/ parameters/ names 
 emgdata = loadmat('J10_s10_i0_pref.mat')
@@ -153,6 +154,9 @@ for MARKER_IX in range(num_markers):
     marker_x = marker_data[:, 0]
     marker_y = marker_data[:, 1]
 
+    #plt.plot(np.arange(2500)/2.5,resampled_data_x[:2500], color = 'r', linewidth=6)
+    #plt.plot(np.arange(1000),marker_x[:1000], color= 'b')
+    #plt.xlim([0,1000])
     filtered_data_x = apply_butterworth_filter_kin(marker_x, SAMPLE_RATE)
     resampled_data_x = signal.resample_poly(filtered_data_x, up=UPSAMPLING, down= DOWNSAMPLING) 
     filtered_data_y = apply_butterworth_filter_kin(marker_y, SAMPLE_RATE)
@@ -263,6 +267,8 @@ plt.show()
 # %% -- plotting savistsky-golay differentiation for each joint on individual plots
 POLYORDER = 5
 WINDOW_LENGTH = 27
+#UPSAMPLING = 5
+#DOWNSAMPLING =2
 
 for JOINT_IX in range(num_joints):
     fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
@@ -336,6 +342,10 @@ for JOINT_IX in range(num_joints):
 # %% -- making a pandas dataframe for joint position, velocity, and acceleration
 dataframe = pd.DataFrame(columns = ['Joint', 'Time', 'Position', 'Velocity', 'Acceleration'])
 rows = []
+UPSAMPLING = 5
+DOWNSAMPLING = 2
+POLYORDER = 5
+WINDOW_LENGTH = 27
 
 for JOINT_IX in range(num_joints):
     joint_data= joints[JOINT_IX][0]
@@ -370,7 +380,7 @@ for JOINT_IX in range(num_joints):
         angular_velocity = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=1, delta=t_joint[1] - t_joint[0])
         angular_acceleration = signal.savgol_filter(resampled_data, window_length=WINDOW_LENGTH, polyorder=POLYORDER, deriv=2, delta=t_joint[1] - t_joint[0])
 
-        for i in range(len(t2)):
+        for i in range(len(t_joint)):
             joint_name = joint_names_1[JOINT_IX][0]
             row = ({'Time': t_joint[i],'Joint': joint_name, 'Position': sg[i], 'Velocity': angular_velocity[i], 'Acceleration': angular_acceleration[i]})
             rows.append(row)
@@ -382,9 +392,6 @@ dataframe_joint.columns = pd.MultiIndex.from_tuples(dataframe_joint.columns)
 
 dataframe_joint.reset_index(inplace=True)
 print(dataframe_joint)
-
-#dataframe = dataframe.sort_values(by='Time')
-#dataframe.set_index('Time', inplace=True)
 
 # %% -- making a pandas dataframe for markers velocity, position, and acceleration
 dataframe_markers = pd.DataFrame(columns=['Marker', 'Time', 'Position', 'Velocity', 'Acceleration'])
@@ -591,9 +598,66 @@ dataframe_joint.set_index('Time', inplace=True)
 
 # Concatenate the dataframes
 dataframe_all = pd.concat([dataframe_multi_markers, dataframe_emg, dataframe_joint], axis=1)
-print(dataframe_all)
-# %% -- making the time locked averaging
+dataframe_all.reset_index(inplace=True)
 
+print(dataframe_all)
+
+# %% -- making the time locked averaging, aligned to swing onset colored by stance duration
+#CHECK JOINTS DATAFRAME, ITS HIGH
+aligned_data = []
+
+for i, row in dataframe_step.iterrows():
+    swing_onset = row['swing_starttime']
+    stance_duration = row['stance_duration']
+
+    window_size = 2 
+    start_window = swing_onset - pd.Timedelta(seconds=window_size)
+    end_window = swing_onset + pd.Timedelta(seconds=window_size)
+
+    dataframe_all['Time'] = pd.to_timedelta(dataframe_all['Time'], unit='s')
+    data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
+
+
+# Loop through each swing onset time to generate a plot
+num_plots = len(dataframe_step['swing_starttime'])
+num_cols = 5  # Number of columns in the grid
+num_rows = (num_plots + num_cols - 1) // num_cols  # Calculate the number of rows needed
+
+fig, axs = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 4))
+axs = axs.flatten()  # Flatten the 2D array of axes to 1D for easy iteration
+
+for idx, onset_time in enumerate(dataframe_step['swing_starttime']):
+    ax = axs[idx]
+    # ax.axvline(x=onset_time, color='red', label=f'Onset at {onset_time}s')  # Vertical line at onset time
+    ax.set_xlim(-10, 10)  # Adjust the x-axis limits as needed
+    ax.set_ylim(0, 10)  # Adjust the y-axis limits as needed
+    ax.set_title(f'Swing Onset at {onset_time}s')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Amplitude')  # Or whatever your y-axis represents
+
+# Hide any unused subplots
+for ax in axs[num_plots:]:
+    ax.axis('off')
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# %% -- from the before, just in case
 window_size = 2
 bins = np.arange(-window_size, window_size, .01)
 
