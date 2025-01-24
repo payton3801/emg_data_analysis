@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.signal as signal
 from scipy.io import loadmat
 import seaborn as sns
+import math
 
 
 # %% -- loading in data/ parameters/ names 
@@ -467,8 +468,8 @@ mindistance_samples = int(mindistance * SAMPLE_RATE)
 peaks, _ = signal.find_peaks(toevelocity, prominence=300, distance=mindistance_samples)
 troughs, _ = signal.find_peaks(-toevelocity, prominence=300, distance=mindistance_samples)
 
-pos_crossing_thresh = 80
-neg_crossing_thresh = -50
+pos_crossing_thresh = 65
+neg_crossing_thresh = -40
 
 def thresh_crossings(data, time, threshold, start_indices, end_indices, min_distance, after_trough=True):
     zero_crossings = []
@@ -494,7 +495,7 @@ plt.scatter(end_crossings, [pos_crossing_thresh] * len(end_crossings), color='bl
 plt.axhline(y=-50, color='red', linestyle='--', linewidth=1, label='Threshold -70')
 plt.axhline(y=80, color='red', linestyle='--', linewidth=1, label='Threshold -70')
 
-plt.xlim([70, 72])
+plt.xlim([50, 54])
 plt.ylim([-500, 500])
 
 print(f'Start Crossings: {start_crossings}')
@@ -604,36 +605,33 @@ print(dataframe_all)
 
 # %% -- making the time locked averaging, aligned to swing onset colored by stance duration
 #CHECK JOINTS DATAFRAME, ITS HIGH
-aligned_data = []
+num_plots = len(dataframe_step['swing_starttime'])
+num_c = 5
+num_r = math.ceil(num_plots / num_c)
+fig, axs = plt.subplots(num_r, num_c, figsize=(20, num_r * 4))
+axs = axs.flatten() 
 
-for i, row in dataframe_step.iterrows():
+window_size = .1
+
+
+for idx, row in dataframe_step.iterrows():
     swing_onset = row['swing_starttime']
-    stance_duration = row['stance_duration']
-
-    window_size = 2 
     start_window = swing_onset - pd.Timedelta(seconds=window_size)
     end_window = swing_onset + pd.Timedelta(seconds=window_size)
 
-    dataframe_all['Time'] = pd.to_timedelta(dataframe_all['Time'], unit='s')
     data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
 
-
-# Loop through each swing onset time to generate a plot
-num_plots = len(dataframe_step['swing_starttime'])
-num_cols = 5  # Number of columns in the grid
-num_rows = (num_plots + num_cols - 1) // num_cols  # Calculate the number of rows needed
-
-fig, axs = plt.subplots(num_rows, num_cols, figsize=(20, num_rows * 4))
-axs = axs.flatten()  # Flatten the 2D array of axes to 1D for easy iteration
-
-for idx, onset_time in enumerate(dataframe_step['swing_starttime']):
     ax = axs[idx]
-    # ax.axvline(x=onset_time, color='red', label=f'Onset at {onset_time}s')  # Vertical line at onset time
-    ax.set_xlim(-10, 10)  # Adjust the x-axis limits as needed
-    ax.set_ylim(0, 10)  # Adjust the y-axis limits as needed
-    ax.set_title(f'Swing Onset at {onset_time}s')
+    for column in dataframe_all['EMG']:
+        ax.plot((data_window['Time'] - swing_onset).dt.total_seconds(), data_window['EMG'], label=column)
+
+    ax.axvline(color='red', linestyle = '--')  # Vertical line at onset time
+    ax.set_xlim(-window_size, window_size)  
+    ax.set_ylim(.5, 1.1) 
+    ax.set_title(f'Swing Onset at {swing_onset.total_seconds()}s')
     ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Amplitude')  # Or whatever your y-axis represents
+    ax.set_ylabel('Rectified EMG Signal')
+
 
 # Hide any unused subplots
 for ax in axs[num_plots:]:
