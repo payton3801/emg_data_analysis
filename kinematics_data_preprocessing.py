@@ -6,6 +6,8 @@ import scipy.signal as signal
 from scipy.io import loadmat
 import seaborn as sns
 import math
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
 
 
 # %% -- loading in data/ parameters/ names 
@@ -495,7 +497,7 @@ plt.scatter(end_crossings, [pos_crossing_thresh] * len(end_crossings), color='bl
 plt.axhline(y=-50, color='red', linestyle='--', linewidth=1, label='Threshold -70')
 plt.axhline(y=80, color='red', linestyle='--', linewidth=1, label='Threshold -70')
 
-plt.xlim([50, 54])
+plt.xlim([0, 5])
 plt.ylim([-500, 500])
 
 print(f'Start Crossings: {start_crossings}')
@@ -522,9 +524,9 @@ step_data = {'step_id': [], 'stance_starttime': [], 'stance_endtime': [], 'swing
 
 for i in range(len(troughs) - 1):
     step_data['step_id'].append(i)
-    step_data['stance_starttime'].append(start_crossings[i])
-    step_data['stance_endtime'].append(end_crossings[i])
-    step_data['swing_starttime'].append(end_crossings[i])
+    step_data['stance_starttime'].append(end_crossings[i])
+    step_data['stance_endtime'].append(start_crossings[i])
+    step_data['swing_starttime'].append(start_crossings[i])
     stance_duration_for_dataframe = end_crossings[i] - start_crossings[i]
     step_data['stance_duration'].append(stance_duration_for_dataframe)
     if i + 1 < len(start_crossings):
@@ -542,35 +544,104 @@ dataframe_step['stance_duration'] = pd.to_timedelta(dataframe_step['stance_durat
 
 print(dataframe_step)
 
-# %% -- preprocessing the data again and making dataframe_emg
+# %% -- smoothed emg
+def lowpass(data, cutoff, fs, order=4):
+    nyquist = 0.5 * fs
+    normal_cutoff = cutoff / nyquist
+    b, a = signal.butter(order, normal_cutoff, btype='low', analog=False)
+    filtered_data = signal.filtfilt(b, a, data)
+    return filtered_data
+
+cutoff_freq = 20
+EMG_SAMPLE_RATE = round(EMG_SAMPLE_RATE)
 finalized_data = []
-for CHAN_IX in range(num_channels):
-    #if CHAN_IX == 6:
-        #continue
-    applied_notch_emg = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+
+
+for CHAN_IX in range(len(channel_names)):
+    applied_notch_emg = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, EMG_SAMPLE_RATE)
     applied_butter_emg = apply_butterworth_filter_emg(applied_notch_emg)
-    rectifieddata_emg = np.abs(applied_butter)
+    filtered_data_emg = lowpass(applied_butter_emg, cutoff_freq, EMG_SAMPLE_RATE)
     
     # Resample the data
-    EMG_SAMPLE_RATE = round(EMG_SAMPLE_RATE)
     TARGET_SAMPLE_RATE = 500
     DOWNSAMPLING_EMG = EMG_SAMPLE_RATE // TARGET_SAMPLE_RATE
-    resampled_data_emg = signal.resample_poly(rectifieddata_emg, down=DOWNSAMPLING, up=1)
+    resampled_data_emg = signal.resample_poly(filtered_data_emg, down=DOWNSAMPLING_EMG, up=1)
     quartiled_data_999 = np.quantile(resampled_data, .999)
-    clipped_data_emg = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data_emg = np.clip(resampled_data_emg, a_max=quartiled_data_999, a_min=None)
     clipped_data_emg = np.abs(clipped_data_emg)
 
     # Quartile clipping the data
-    quartiled_data_95_emg = np.quantile(clipped_data_emg, .95)
-    duration_emg = len(resampled_data) / TARGET_SAMPLE_RATE
-    t_emg = np.linspace(0, duration, len(resampled_data), endpoint=False)
+    quartiled_data_95 = np.quantile(clipped_data_emg, .95)
+    duration_emg = len(resampled_data_emg) / TARGET_SAMPLE_RATE
+    t_emg = np.linspace(0, duration_emg, len(resampled_data_emg), endpoint=False)
 
-    normalized_data = clipped_data_emg / quartiled_data_95_emg
-    normalized_data = np.abs(normalized_data)
+    normalized_data_emg = clipped_data_emg / quartiled_data_95
+    normalized_data_emg =np.abs(normalized_data_emg)
 
     for i in range(len(t_emg)):
         finalized_data.append({
             'Time': t_emg[i],
+            'Channel': channel_names[CHAN_IX],
+            'Finalized Data': normalized_data_emg[i]
+        })
+
+dataframe_emg = pd.DataFrame(finalized_data)
+dataframe_emg = dataframe_emg.pivot_table(index='Time', columns='Channel', values='Finalized Data')
+dataframe_emg.columns = pd.MultiIndex.from_product([['EMG'], dataframe_emg.columns.tolist()])
+
+desired_timepoints = 53285
+current_timepoints = len(dataframe_emg)
+
+if current_timepoints > desired_timepoints:
+    dataframe_emg = dataframe_emg.iloc[:desired_timepoints]
+
+print(f"Number of rows in dataframe_emg: {len(dataframe_emg)}")
+print(dataframe_emg)
+
+ta_data = dataframe_emg['EMG']['TA']
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(ta_data.index, ta_data, color='blue', alpha=0.7)
+
+ax.set_title('EMG Signal for TA Muscle')
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Rectified EMG Signal')
+
+# Set x-axis limits to 0.2 seconds
+ax.set_xlim(0, 5)
+
+plt.tight_layout()
+plt.show()
+
+# %% -- preprocessing the data again and making dataframe_emg
+finalized_data = []
+for CHAN_IX in range(len(channel_names)):
+    #if CHAN_IX == 6:
+        #continue
+    applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
+    applied_butter = apply_butterworth_filter_emg(applied_notch)
+    rectifieddata = np.abs(applied_butter)
+    
+    # Resample the data
+    EMG_SAMPLE_RATE = round(EMG_SAMPLE_RATE)
+    TARGET_SAMPLE_RATE = 500
+    DOWNSAMPLING = EMG_SAMPLE_RATE // TARGET_SAMPLE_RATE
+    resampled_data = signal.resample_poly(rectifieddata, down=DOWNSAMPLING, up=1)
+    quartiled_data_999 = np.quantile(resampled_data, .999)
+    clipped_data = np.clip(resampled_data, a_max=quartiled_data_999, a_min=None)
+    clipped_data = np.abs(clipped_data)
+
+    # Quartile clipping the data
+    quartiled_data_95 = np.quantile(clipped_data, .95)
+    #duration = len(resampled_data) / TARGET_SAMPLE_RATE
+    t = np.arange(len(resampled_data))/ TARGET_SAMPLE_RATE
+
+    normalized_data = clipped_data / quartiled_data_95
+    normalized_data=np.abs(normalized_data)
+
+    for i in range(len(t)):
+        finalized_data.append({
+            'Time': t[i],
             'Channel': channel_names[CHAN_IX],
             'Finalized Data': normalized_data[i]
         })
@@ -578,7 +649,16 @@ for CHAN_IX in range(num_channels):
 dataframe_emg = pd.DataFrame(finalized_data)
 dataframe_emg = dataframe_emg.pivot_table(index='Time', columns='Channel', values='Finalized Data')
 dataframe_emg.columns = pd.MultiIndex.from_product([['EMG'], dataframe_emg.columns.tolist()])
+
+desired_timepoints = 53285
+current_timepoints = len(dataframe_emg)
+
+if current_timepoints > desired_timepoints:
+    dataframe_emg = dataframe_emg.iloc[:desired_timepoints]
+
+print(f"Number of rows in dataframe_emg: {len(dataframe_emg)}")
 print(dataframe_emg)
+
 
 # %% -- concatenating the dataframes
 if 'Time' not in dataframe_multi_markers.columns:
@@ -604,7 +684,10 @@ dataframe_all.reset_index(inplace=True)
 print(dataframe_all)
 
 # %% -- making the time locked averaging, aligned to swing onset colored by stance duration
-#CHECK JOINTS DATAFRAME, ITS HIGH
+#try to make one plot for one graph
+dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
+norm = Normalize(vmin=0.22, vmax=0.37)
+cmap = plt.get_cmap('viridis')  
 num_plots = len(dataframe_step['swing_starttime'])
 num_c = 5
 num_r = math.ceil(num_plots / num_c)
@@ -613,24 +696,27 @@ axs = axs.flatten()
 
 window_size = .1
 
-
 for idx, row in dataframe_step.iterrows():
     swing_onset = row['swing_starttime']
     start_window = swing_onset - pd.Timedelta(seconds=window_size)
     end_window = swing_onset + pd.Timedelta(seconds=window_size)
+    color = cmap(norm(row['stance_duration_seconds']))  # Get color based on stance duration in seconds
+
 
     data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
 
     ax = axs[idx]
-    for column in dataframe_all['EMG']:
-        ax.plot((data_window['Time'] - swing_onset).dt.total_seconds(), data_window['EMG'], label=column)
+    for column in dataframe_all.filter(like='EMG').columns:
+        time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
+        ax.plot(time_relative, data_window[column], label=column, color=color) 
 
     ax.axvline(color='red', linestyle = '--')  # Vertical line at onset time
     ax.set_xlim(-window_size, window_size)  
-    ax.set_ylim(.5, 1.1) 
+    ax.set_ylim(0, 3) 
     ax.set_title(f'Swing Onset at {swing_onset.total_seconds()}s')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Rectified EMG Signal')
+    ax.legend() 
 
 
 # Hide any unused subplots
@@ -641,18 +727,79 @@ plt.tight_layout()
 plt.show()
 
 
+# %%
+#individual plots for psths
+dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
+norm = Normalize(vmin=dataframe_step['stance_duration_seconds'].min(), vmax=dataframe_step['stance_duration_seconds'].max())
+cmap = plt.get_cmap('viridis')  
+num_plots = len(dataframe_step['swing_starttime'])
+num_c = 5
+num_r = math.ceil(num_plots / num_c)
+fig, axs = plt.subplots(num_r, num_c, figsize=(20, num_r * 4))
+axs = axs.flatten() 
+
+window_size = .2
+
+for idx, row in dataframe_step.iterrows():
+    swing_onset = row['swing_starttime']
+    start_window = swing_onset - pd.Timedelta(seconds=window_size)
+    end_window = swing_onset + pd.Timedelta(seconds=window_size)
+    color = cmap(norm(row['stance_duration_seconds']))  # Get color based on stance duration in seconds
+
+    data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
+
+    ax = axs[idx]
+    time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
+    ax.plot(time_relative, data_window['EMG']['TA'], color=color) 
+
+    ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
+    ax.set_xlim(-window_size, window_size)  
+    ax.set_ylim(0, 3) 
+    ax.set_title(f'Swing Onset at {swing_onset.total_seconds()}s')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Rectified EMG Signal') 
+
+# Hide any unused subplots
+for ax in axs[num_plots:]:
+    ax.axis('off')
+
+plt.tight_layout()
+plt.show()
+
+# %% -- all muscle traces on one plot
+dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
+norm = Normalize(vmin=dataframe_step['stance_duration_seconds'].min(), vmax=dataframe_step['stance_duration_seconds'].max())
+cmap = plt.get_cmap('viridis')
+
+fig, ax = plt.subplots(figsize=(10, 6))
+window_size = 0.2
+
+for idx, row in dataframe_step.iterrows():
+    swing_onset = row['swing_starttime']
+    start_window = swing_onset - pd.Timedelta(seconds=window_size)
+    end_window = swing_onset + pd.Timedelta(seconds=window_size)
+    
+    color = cmap(norm(row['stance_duration_seconds']))
+
+    data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
+    time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
+    
+    ax.plot(time_relative, data_window['EMG']['TA'], color=color, alpha=0.3) 
+    ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
 
 
+ax.set_xlim(-window_size, window_size)  
+ax.set_ylim(0, 3) 
+ax.set_title('Activity Across Multiple Step Cycles')
+ax.set_xlabel('Time Relative to Swing Onset (s)')
+ax.set_ylabel('Rectified EMG Signal') 
 
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
 
-
-
-
-
-
-
-
-
+plt.tight_layout()
+plt.show()
 
 
 # %% -- from the before, just in case
@@ -698,4 +845,4 @@ plt.show()
 
 # concatanate this dataframe: [ emg | mk_pos | mk_vel | mk_acc | joint_ang_pos | joint_ang_vel | joint_ang_acc ]
 # use arrays to make dataframes instead of dictionaries
-# was indexing time by time, dont use histograms for "psths" and also they arent psths
+# was indexing time by time, dont use histograms for "psths" and also they arent psthswwwwwww
