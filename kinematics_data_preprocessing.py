@@ -522,17 +522,17 @@ plt.show()
 # %% -- creating swing/stance dataframe_step
 step_data = {'step_id': [], 'stance_starttime': [], 'stance_endtime': [], 'swing_starttime': [], 'swing_endtime': [], 'stance_duration': []}
 
-for i in range(len(troughs) - 1):
+for i in range(len(end_crossings) - 1):
     step_data['step_id'].append(i)
-    step_data['stance_starttime'].append(end_crossings[i])
-    step_data['stance_endtime'].append(start_crossings[i])
-    step_data['swing_starttime'].append(start_crossings[i])
+    step_data['swing_starttime'].append(end_crossings[i])
+    step_data['swing_endtime'].append(start_crossings[i+1])
+    step_data['stance_starttime'].append(start_crossings[i+1])
     stance_duration_for_dataframe = end_crossings[i] - start_crossings[i]
     step_data['stance_duration'].append(stance_duration_for_dataframe)
     if i + 1 < len(start_crossings):
-        step_data['swing_endtime'].append(start_crossings[i + 1])
+        step_data['stance_endtime'].append(end_crossings[i + 1])
     else:
-        step_data['swing_endtime'].append(None)  # Handle the last element case
+        step_data['stance_endtime'].append(None)  # Handle the last element case
 
 dataframe_step = pd.DataFrame(step_data)
 
@@ -659,6 +659,19 @@ if current_timepoints > desired_timepoints:
 print(f"Number of rows in dataframe_emg: {len(dataframe_emg)}")
 print(dataframe_emg)
 
+ta_data = dataframe_emg['EMG']['TA']
+
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.plot(ta_data.index, ta_data, color='blue', alpha=0.7)
+
+ax.set_title('EMG Signal for TA Muscle')
+ax.set_xlabel('Time (s)')
+ax.set_ylabel('Rectified EMG Signal')
+
+ax.set_xlim(0, 5)
+
+plt.tight_layout()
+plt.show()
 
 # %% -- concatenating the dataframes
 if 'Time' not in dataframe_multi_markers.columns:
@@ -669,8 +682,8 @@ if 'Time' not in dataframe_joint.columns:
     dataframe_joint.reset_index(inplace=True)
 
 dataframe_multi_markers['Time'] = pd.to_timedelta(dataframe_multi_markers['Time'], unit='s')
-dataframe_joint['Time'] = pd.to_timedelta(dataframe_joint['Time'], unit='s')
-dataframe_emg['Time'] = pd.to_timedelta(dataframe_emg['Time'], unit='s')
+dataframe_joint['Time'] = pd.to_timedelta(dataframe_joint['Time'], unit='s') # .dt.total_seconds()
+dataframe_emg['Time'] = pd.to_timedelta(dataframe_emg['Time'], unit='s') # .dt.total_seconds()
 
 # Set 'Time' as the index for each dataframe
 dataframe_multi_markers.set_index('Time', inplace=True)
@@ -679,56 +692,11 @@ dataframe_joint.set_index('Time', inplace=True)
 
 # Concatenate the dataframes
 dataframe_all = pd.concat([dataframe_multi_markers, dataframe_emg, dataframe_joint], axis=1)
-dataframe_all.reset_index(inplace=True)
+# dataframe_all.reset_index(inplace=True)
 
 print(dataframe_all)
 
-# %% -- making the time locked averaging, aligned to swing onset colored by stance duration
-#try to make one plot for one graph
-dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
-norm = Normalize(vmin=0.22, vmax=0.37)
-cmap = plt.get_cmap('viridis')  
-num_plots = len(dataframe_step['swing_starttime'])
-num_c = 5
-num_r = math.ceil(num_plots / num_c)
-fig, axs = plt.subplots(num_r, num_c, figsize=(20, num_r * 4))
-axs = axs.flatten() 
-
-window_size = .1
-
-for idx, row in dataframe_step.iterrows():
-    swing_onset = row['swing_starttime']
-    start_window = swing_onset - pd.Timedelta(seconds=window_size)
-    end_window = swing_onset + pd.Timedelta(seconds=window_size)
-    color = cmap(norm(row['stance_duration_seconds']))  # Get color based on stance duration in seconds
-
-
-    data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
-
-    ax = axs[idx]
-    for column in dataframe_all.filter(like='EMG').columns:
-        time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
-        ax.plot(time_relative, data_window[column], label=column, color=color) 
-
-    ax.axvline(color='red', linestyle = '--')  # Vertical line at onset time
-    ax.set_xlim(-window_size, window_size)  
-    ax.set_ylim(0, 3) 
-    ax.set_title(f'Swing Onset at {swing_onset.total_seconds()}s')
-    ax.set_xlabel('Time (s)')
-    ax.set_ylabel('Rectified EMG Signal')
-    ax.legend() 
-
-
-# Hide any unused subplots
-for ax in axs[num_plots:]:
-    ax.axis('off')
-
-plt.tight_layout()
-plt.show()
-
-
-# %%
-#individual plots for psths
+# %% -- individual plots for psths
 dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
 norm = Normalize(vmin=dataframe_step['stance_duration_seconds'].min(), vmax=dataframe_step['stance_duration_seconds'].max())
 cmap = plt.get_cmap('viridis')  
@@ -742,14 +710,15 @@ window_size = .2
 
 for idx, row in dataframe_step.iterrows():
     swing_onset = row['swing_starttime']
-    start_window = swing_onset - pd.Timedelta(seconds=window_size)
-    end_window = swing_onset + pd.Timedelta(seconds=window_size)
+    swing_onset_seconds = swing_onset.total_seconds()
+    start_window = swing_onset_seconds - window_size
+    end_window = swing_onset_seconds + window_size
     color = cmap(norm(row['stance_duration_seconds']))  # Get color based on stance duration in seconds
 
     data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
 
     ax = axs[idx]
-    time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
+    time_relative = data_window['Time'] - swing_onset_seconds
     ax.plot(time_relative, data_window['EMG']['TA'], color=color) 
 
     ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
@@ -766,7 +735,7 @@ for ax in axs[num_plots:]:
 plt.tight_layout()
 plt.show()
 
-# %% -- all muscle traces on one plot
+# %% -- all muscle traces on one plot for one muscle
 dataframe_step['stance_duration_seconds'] = dataframe_step['stance_duration'].apply(lambda x: x.total_seconds())
 norm = Normalize(vmin=dataframe_step['stance_duration_seconds'].min(), vmax=dataframe_step['stance_duration_seconds'].max())
 cmap = plt.get_cmap('viridis')
@@ -776,13 +745,15 @@ window_size = 0.2
 
 for idx, row in dataframe_step.iterrows():
     swing_onset = row['swing_starttime']
-    start_window = swing_onset - pd.Timedelta(seconds=window_size)
-    end_window = swing_onset + pd.Timedelta(seconds=window_size)
+    swing_onset_seconds = swing_onset.total_seconds()
+
+    start_window = swing_onset_seconds - window_size
+    end_window = swing_onset_seconds + window_size
     
     color = cmap(norm(row['stance_duration_seconds']))
 
     data_window = dataframe_all[(dataframe_all['Time'] >= start_window) & (dataframe_all['Time'] <= end_window)]
-    time_relative = (data_window['Time'] - swing_onset).dt.total_seconds()
+    time_relative = data_window['Time'] - swing_onset_seconds
     
     ax.plot(time_relative, data_window['EMG']['TA'], color=color, alpha=0.3) 
     ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
