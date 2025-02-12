@@ -464,6 +464,7 @@ plt.xlim([0,10])
 plt.show()
 
 # %% -- plotting the toevelocities to map out threshold crossing around each step
+
 mindistance = .3
 mindistance_samples = int(mindistance * SAMPLE_RATE)
 
@@ -816,4 +817,4 @@ plt.show()
 
 # concatanate this dataframe: [ emg | mk_pos | mk_vel | mk_acc | joint_ang_pos | joint_ang_vel | joint_ang_acc ]
 # use arrays to make dataframes instead of dictionaries
-# was indexing time by time, dont use histograms for "psths" and also they arent psthswwwwwww
+# was indexing time by time, dont use histograms for "psths" and also they arent psths
