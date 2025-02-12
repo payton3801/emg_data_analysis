@@ -412,11 +412,16 @@ for CHAN_IX in range(num_channels):
     axes[0].set_xlim([0, duration])
     axes[0].set_title("Time plots of Clipped Data")
 
+
     # Plot of normalized data
     axes[1].plot(t, normalized_data, alpha=0.5, label=f'Normalized Data {channel_names[CHAN_IX]}')
     axes[1].axhline(y=1, color='k', linestyle='--', label='95th Quantile')
     axes[1].set_xlim([0, duration])
     axes[1].set_title("Time plots of Normalized Data")
+    print(f'Channel {CHAN_IX} 99th percentile: {quartiled_data_999}')
+    print(f'Channel {CHAN_IX} 95th percentile of clipped data: {quartiled_data_95}')
+    print(f'Channel {CHAN_IX} max clipped value: {np.max(clipped_data)}')
+    print(f'Channel {CHAN_IX} max normalized value: {np.max(normalized_data)}')
 
 CHAN_IX = 6
 applied_notch = apply_notch_filter(rawdata[:, CHAN_IX], notch_frequencies, bandwidth, SAMPLE_RATE)
@@ -435,19 +440,20 @@ t = np.linspace(0, duration, len(resampled_data), endpoint=False)
 normalized_data = clipped_data / quartiled_data_95
 
 # Plot of clipped data for channel 6
-axes[0].plot(t, clipped_data, alpha=0.5, label=f'Clipped Data {channel_names[CHAN_IX]}')
+axes[0].plot(t, clipped_data, alpha=0.5)
 axes[0].axhline(y=quartiled_data_95, color='k', linestyle='--', label='95th Quantile')
-axes[0].set_xlim([0, duration])
+axes[0].set_xlim([0,duration])
+axes[0].set_ylim([0,1])
 axes[0].set_title("Time plots of Clipped Data")
 
 # Plot of normalized data for channel 6
-axes[1].plot(t, normalized_data, alpha=0.5, label=f'Normalized Data {channel_names[CHAN_IX]}')
+axes[1].plot(t, normalized_data, alpha=0.5)
 axes[1].axhline(y=1, color='k', linestyle='--', label='95th Quantile')
 axes[1].set_xlim([0, duration])
 axes[1].set_title("Time plots of Normalized Data")
 
 # Show the plot
-# plt.legend()
+plt.legend()
 plt.tight_layout()
 plt.show()
 
