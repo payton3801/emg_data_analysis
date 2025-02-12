@@ -375,7 +375,7 @@ plt.axhline(y=50, color='blue', linestyle='--', linewidth=1)
 plt.axhline(y=-20, color='blue', linestyle='--', linewidth=1)
 
 #plt.ylim([-100,100])
-plt.xlim([2.75,3.5])
+plt.xlim([2.75,3.25])
 plt.show()
 
 # %%
@@ -386,14 +386,13 @@ mindistance_samples = int(mindistance * EMG_SAMPLE_RATE)
 lower_mindistance = .02
 upper_mindistance = .03
 
-
 peaks, _ = signal.find_peaks(toevelocity, prominence=300, distance=mindistance_samples)
 troughs, _ = signal.find_peaks(-toevelocity, prominence=300, distance=mindistance_samples)
 
 pos_crossing_thresh = 80
 neg_crossing_thresh = -45
 
-def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices, end_indices, min_distance, lower_min_distance, upper_min_distance):
+def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices, end_indices, min_distance, lower_min_distance, upper_min_distance, new_points=None, indices_to_delete=None):
     crossings = []
     last_crossing_time = -np.inf  # Initialize to negative infinity
     last_lower_crossing_time = -np.inf  # Separate last crossing time for lower threshold
@@ -413,16 +412,34 @@ def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices
                     if upper_crossing_time - last_crossing_time >= upper_min_distance:
                         crossings.append((upper_crossing_time, upper_threshold))
                         last_crossing_time = upper_crossing_time
+
+    # Insert the new points if provided
+    if new_points:
+        crossings.extend(new_points)
+        crossings.sort()  # Ensure the crossings list is sorted by time
+
+    # Remove the points from the crossings list if indices to delete are provided
+    if indices_to_delete:
+        crossings = [crossing for i, crossing in enumerate(crossings) if i not in indices_to_delete]
+
     return crossings
 
-crossings = thresh_crossings(toevelocity, time, neg_crossing_thresh, pos_crossing_thresh, troughs[:-1], peaks[1:], mindistance, lower_mindistance, upper_mindistance)
+new_points = [(3.461, -45), (6.024, -45), (11.302, -45)]
+indices_to_delete = [86, 97, 98, 176, 347]
+crossings = thresh_crossings(toevelocity, time, neg_crossing_thresh, pos_crossing_thresh, troughs[:-1], peaks[1:], mindistance, lower_mindistance, upper_mindistance, new_points=new_points, indices_to_delete=indices_to_delete)
 
 # Count upper and lower crossings
-upper_crossings_count = sum(1 for crossing in crossings if crossing[1] == pos_crossing_thresh)
-lower_crossings_count = sum(1 for crossing in crossings if crossing[1] == neg_crossing_thresh)
+upper_crossings = [crossing for crossing in crossings if crossing[1] == pos_crossing_thresh]
+lower_crossings = [crossing for crossing in crossings if crossing[1] == neg_crossing_thresh]
+
+upper_crossings_count = len(upper_crossings)
+lower_crossings_count = len(lower_crossings)
 
 print(f'Upper crossings count: {upper_crossings_count}')
 print(f'Lower crossings count: {lower_crossings_count}')
+
+print('Upper crossings:', upper_crossings)
+print('Lower crossings:', lower_crossings)
 
 # --- plotting with the indices labeled
 plt.plot(time, toevelocity)
@@ -437,93 +454,23 @@ plt.xlim([0, 3])
 
 plt.show()
 
-
-# %% --- adding in new points during messy part
-
-new_points = [(3.461, -45), (6.024, -45), (11.302, -45)]
-def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices, end_indices, min_distance, lower_min_distance, upper_min_distance, new_points=new_points):
-    crossings = []
-    last_crossing_time = -np.inf  # Initialize to negative infinity
-    last_lower_crossing_time = -np.inf  # Separate last crossing time for lower threshold
-    for start, end in zip(start_indices, end_indices):
-        after_trough = False
-        for i in range(start, end):
-            if data.iloc[i] == min(data.iloc[start:end+1]): 
-                after_trough = True # Check for trough
-            if after_trough:
-                if data.iloc[i] < lower_threshold and data.iloc[i + 1] > lower_threshold:
-                    lower_crossing_time = time[i] + (time[i + 1] - time[i]) * ((lower_threshold - data.iloc[i]) / (data.iloc[i + 1] - data.iloc[i]))
-                    if lower_crossing_time - last_lower_crossing_time >= lower_min_distance:
-                        crossings.append((lower_crossing_time, lower_threshold))
-                        last_lower_crossing_time = lower_crossing_time
-                if data.iloc[i] < upper_threshold and data.iloc[i + 1] > upper_threshold:
-                    upper_crossing_time = time[i] + (time[i + 1] - time[i]) * ((upper_threshold - data.iloc[i]) / (data.iloc[i + 1] - data.iloc[i]))
-                    if upper_crossing_time - last_crossing_time >= upper_min_distance:
-                        crossings.append((upper_crossing_time, upper_threshold))
-                        last_crossing_time = upper_crossing_time
-
-    # Insert the new point if provided
-    if new_points:
-        crossings.extend(new_points)
-        crossings.sort()  # Ensure the crossings list is sorted by time
-
-    return crossings
-
-crossings = thresh_crossings(toevelocity, time, neg_crossing_thresh, pos_crossing_thresh, troughs[:-1], peaks[1:], mindistance, lower_mindistance, upper_mindistance, new_points=new_points)
-
-
-plt.figure(figsize=(24,6))
-plt.plot(time, toevelocity)
-for i, (crossing_time, threshold) in enumerate(crossings):
-    plt.scatter(crossing_time, threshold, color='black', label='Crossing' if i == 0 else "")
-    plt.annotate(str(i), (crossing_time, threshold), textcoords="offset points", xytext=(0,10), ha='center')
-
-plt.axhline(y=neg_crossing_thresh, color='red', linestyle='--', linewidth=1, label='Lower Threshold')
-plt.axhline(y=pos_crossing_thresh, color='blue', linestyle='--', linewidth=1, label='Upper Threshold')
-
-plt.xlim([3.3, 4.0])
-
-plt.show()
-
-# %% --- deleting indices and naning data where swing looks wrong
-
-plt.figure(figsize=(24,6))
-
-indices_to_delete = [86, 98, 99, 176, 347]
-
-# Remove the points from the crossings list
-crossings = [crossing for i, crossing in enumerate(crossings) if i not in indices_to_delete]
-
-# Re-plot the data
-plt.plot(time, toevelocity)
-for i, (crossing_time, threshold) in enumerate(crossings):
-    plt.scatter(crossing_time, threshold, color='black', label='Crossing' if i == 0 else "")
-    plt.annotate(str(i), (crossing_time, threshold), textcoords="offset points", xytext=(0,10), ha='center')
-
-
-plt.axhline(y=neg_crossing_thresh, color='red', linestyle='--', linewidth=1, label='Lower Threshold')
-plt.axhline(y=pos_crossing_thresh, color='blue', linestyle='--', linewidth=1, label='Upper Threshold')
-
-plt.xlim([11, 12.5])
-plt.show()
-
 # %% --- making swing/stance dataframe
 
-# Extract start and end times for stance phases
-start_stance_times = [crossing_time for crossing_time, threshold in crossings if threshold == -45]
-end_stance_times = [crossing_time for crossing_time, threshold in crossings if threshold == 80]
+upper_crossing_times = [crossing_time for crossing_time, _ in upper_crossings]
+lower_crossing_times = [crossing_time for crossing_time, _ in lower_crossings]
+
 
 # creating dataframe
 step_df = pd.DataFrame({
-    'Start Stance': start_stance_times,
-    'End Stance': end_stance_times,
-    'Start Swing': end_stance_times,
-    'End Swing': start_stance_times[1:] + [np.nan]
+    'Start Stance': lower_crossing_times,
+    'End Stance': upper_crossing_times,
+    'Start Swing': upper_crossing_times,
+    'End Swing': lower_crossing_times[1:] + [np.nan]
 })
 
 # making the last start swing nan since the data ends in a stance
 step_df.at[len(step_df) - 1, 'Start Swing'] = np.nan
-print(step_df)
+print(step_df.to_string())
 
 
 # %% --- making stance duration histogram
@@ -545,4 +492,97 @@ plt.ylabel('Step Count')
 plt.title('Swing Times for Each Step')
 plt.show()
 
+
+
+# %% --- making swing/stance dataframe
+
+# Extract start and end times for stance phases
+start_stance_times = [crossing_time for crossing_time, threshold in crossings if threshold == -45]
+end_stance_times = [crossing_time for crossing_time, threshold in crossings if threshold == 80]
+
+# creating dataframe
+step_df = pd.DataFrame({
+    'Start Stance': start_stance_times,
+    'End Stance': end_stance_times,
+    'Start Swing': end_stance_times,
+    'End Swing': start_stance_times[1:] + [np.nan]
+})
+
+step_df['Stance Duration'] = step_df['End Stance'] - step_df['Start Stance']
+
+# making the last start swing nan since the data ends in a stance
+step_df.at[len(step_df) - 1, 'Start Swing'] = np.nan
+print(step_df.to_string())
+
+
+# %% --- making stance duration histogram
+start_crossings = [crossing_time for crossing_time, threshold in crossings if threshold == neg_crossing_thresh]
+end_crossings = [crossing_time for crossing_time, threshold in crossings if threshold == pos_crossing_thresh]
+
+stance_duration= [end-start for end, start in zip(end_crossings, start_crossings)]
+plt.hist(stance_duration, bins=100)
+plt.xlabel('Stance Times (in s)')
+plt.ylabel('Step count')
+plt.title('Stance Times for Each Step')
+plt.show()
+
+# %% --- making the swing duration histogram
+swing_duration= [start-end for start, end in zip(start_crossings[1:], end_crossings[:-1])]
+plt.hist(swing_duration, bins=100)
+plt.xlabel('Swing times (in s)')
+plt.ylabel('Step Count')
+plt.title('Swing Times for Each Step')
+plt.show()
+
+# %%
+# creating dataframe
+step_df = pd.DataFrame({
+    'Start Stance': start_stance_times,
+    'End Stance': end_stance_times,
+    'Start Swing': end_stance_times,
+    'End Swing': start_stance_times[1:] + [np.nan]
+})
+
+# making the last start swing nan since the data ends in a stance
+step_df.at[len(step_df) - 1, 'Start Swing'] = np.nan
+
+# Adding stance duration column
+step_df['Stance Duration'] = step_df['End Stance'] - step_df['Start Stance']
+
+# Convert stance duration to seconds
+step_df['stance_duration_seconds'] = step_df['Stance Duration']
+
+# Normalize stance duration for color mapping
+norm = Normalize(vmin=step_df['stance_duration_seconds'].min(), vmax=step_df['stance_duration_seconds'].max())
+cmap = plt.get_cmap('viridis')
+
+fig, ax = plt.subplots(figsize=(10, 6))
+window_size = 0.02
+
+for idx, row in step_df.iterrows():
+    swing_onset = row['Start Swing']
+    swing_onset_seconds = swing_onset
+
+    start_window = swing_onset_seconds - window_size
+    end_window = swing_onset_seconds + window_size
+    
+    color = cmap(norm(row['stance_duration_seconds']))
+
+    data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]
+    time_relative = data_window.index - swing_onset_seconds
+    
+    ax.plot(time_relative, data_window['EMG']['EMG']['IL'], color=color, alpha=0.3) 
+    ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
+
+ax.set_xlim(-window_size, window_size)  
+ax.set_title('Activity Across Multiple Step Cycles')
+ax.set_xlabel('Time Relative to Swing Onset (s)')
+ax.set_ylabel('Rectified EMG Signal') 
+
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
+
+plt.tight_layout()
+plt.show()
 # %%
