@@ -375,7 +375,7 @@ plt.axhline(y=50, color='blue', linestyle='--', linewidth=1)
 plt.axhline(y=-20, color='blue', linestyle='--', linewidth=1)
 
 #plt.ylim([-100,100])
-plt.xlim([2.75,3.25])
+plt.xlim([2,3.25])
 plt.show()
 
 # %%
@@ -450,7 +450,7 @@ for i, (crossing_time, threshold) in enumerate(crossings):
 plt.axhline(y=neg_crossing_thresh, color='red', linestyle='--', linewidth=1, label='Lower Threshold')
 plt.axhline(y=pos_crossing_thresh, color='blue', linestyle='--', linewidth=1, label='Upper Threshold')
 
-plt.xlim([0, 3])
+plt.xlim([10.8,11.5])
 
 plt.show()
 
@@ -492,8 +492,6 @@ plt.ylabel('Step Count')
 plt.title('Swing Times for Each Step')
 plt.show()
 
-
-
 # %% --- making swing/stance dataframe
 
 # Extract start and end times for stance phases
@@ -509,11 +507,21 @@ step_df = pd.DataFrame({
 })
 
 step_df['Stance Duration'] = step_df['End Stance'] - step_df['Start Stance']
+step_df['Swing Duration'] = step_df['End Swing'] - step_df['Start Swing']
+
+#naning where swing is weird
+step_df.loc[42, 'Start Swing'] = np.nan
+step_df.loc[42, 'End Swing'] = np.nan
+step_df.loc[47, 'Start Swing'] = np.nan
+step_df.loc[47, 'End Swing'] = np.nan
+step_df.loc[85, 'Start Swing'] = np.nan
+step_df.loc[85, 'End Swing'] = np.nan
+step_df.loc[170, 'Start Swing'] = np.nan
+step_df.loc[170, 'End Swing'] = np.nan
 
 # making the last start swing nan since the data ends in a stance
 step_df.at[len(step_df) - 1, 'Start Swing'] = np.nan
 print(step_df.to_string())
-
 
 # %% --- making stance duration histogram
 start_crossings = [crossing_time for crossing_time, threshold in crossings if threshold == neg_crossing_thresh]
@@ -552,37 +560,60 @@ step_df['Stance Duration'] = step_df['End Stance'] - step_df['Start Stance']
 # Convert stance duration to seconds
 step_df['stance_duration_seconds'] = step_df['Stance Duration']
 
-# Normalize stance duration for color mapping
-norm = Normalize(vmin=step_df['stance_duration_seconds'].min(), vmax=step_df['stance_duration_seconds'].max())
-cmap = plt.get_cmap('viridis')
+# %%
+WINDOW_SIZE = .025
+NUM_BINS = 180 #180 bins is the same as step size, plots single trials
 
-fig, ax = plt.subplots(figsize=(10, 6))
-window_size = 0.02
+def plotting_trials(step_df, df_all, num_bins = NUM_BINS, window_size = 0.025):
 
-for idx, row in step_df.iterrows():
-    swing_onset = row['Start Swing']
-    swing_onset_seconds = swing_onset
+    # Normalize stance duration for color mapping
+    norm = Normalize(vmin=.035, vmax=.065)
+    cmap = plt.get_cmap('viridis')
 
-    start_window = swing_onset_seconds - window_size
-    end_window = swing_onset_seconds + window_size
-    
-    color = cmap(norm(row['stance_duration_seconds']))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]
-    time_relative = data_window.index - swing_onset_seconds
-    
-    ax.plot(time_relative, data_window['EMG']['EMG']['IL'], color=color, alpha=0.3) 
-    ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
+    for bin_num in range(num_bins):
+        bin_df = step_df[step_df['bin'] == bin_num]
+        mean_data = None
+        count = 0
+        for idx, row in bin_df.iterrows():
+            swing_onset = row['Start Swing']
 
-ax.set_xlim(-window_size, window_size)  
-ax.set_title('Activity Across Multiple Step Cycles')
-ax.set_xlabel('Time Relative to Swing Onset (s)')
-ax.set_ylabel('Rectified EMG Signal') 
+            start_window = swing_onset - window_size
+            end_window = swing_onset + window_size
+            
+            data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]
+            if data_window.empty:
+                continue
+            
+            time_relative = data_window.index - swing_onset
+            
+            if mean_data is None:
+                mean_data = data_window['EMG']['EMG']['IL'].values
+            else:
+                mean_data += data_window['EMG']['EMG']['IL'].values
+            count += 1
+        
+        if mean_data is not None:
+            mean_data /= count
+            color = cmap(norm(bin_df['stance_duration_seconds'].mean()))
+            ax.plot(time_relative, mean_data, color=color, label=f'Bin {bin_num + 1}')
+            ax.axvline(color='red', linestyle='--')  # Vertical line at onset time
 
-sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-sm.set_array([])
-plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
 
-plt.tight_layout()
-plt.show()
+    ax.set_xlim(-window_size, window_size)  
+    ax.set_title('Activity Across Multiple Step Cycles')
+    ax.set_xlabel('Time Relative to Swing Onset (s)')
+    ax.set_ylabel('Rectified EMG Signal') 
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
+
+    plt.tight_layout()
+    plt.show()
+
+plotting_trials(step_df, df_all, num_bins=2, window_size=0.025)
+
+
 # %%
