@@ -6,9 +6,13 @@ import scipy.signal as signal
 from scipy.io import loadmat
 import seaborn as sns
 import math
+import plotly.graph_objs as go
 from copy import deepcopy
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
+from sklearn.decomposition import PCA
+from mpl_toolkits.mplot3d import Axes3D
+
 
 # %% -- load mat file
 mat_data = loadmat('J10_s10_i0_pref.mat')
@@ -172,8 +176,26 @@ for i in range(emg_filt.shape[1]):
 # --- rectifying data
 emg_rectify = np.abs(emg_filt)
 
+
+
+
+
+
+
+############################
+#working on smoothing emg here
+############################
+
+
+
+
+smooth_emg_rectify = apply_butter_filter(emg_rectify, fs = EMG_SAMPLE_RATE, cutoff_freq=10, btype="low", filt_order=4)
+
+
 # --- resampling data
-emg_resamp = apply_data_resampling(emg_rectify, upsampling=1, downsampling=10)
+emg_resamp = apply_data_resampling(smooth_emg_rectify, upsampling=1, downsampling=10)
+non_smooth_emg_resamp = apply_data_resampling(emg_rectify, upsampling=1, downsampling=10)
+#emg_resamp = apply_data_resampling(smooth_emg_rectify, upsampling=1, downsampling=10)
 
 # --- quartile clipping (channel 6 gets special attention)
 for i in range(num_channels):
@@ -379,16 +401,6 @@ plt.xlim([2,3.25])
 plt.show()
 
 
-
-
-
-
-
-
-
-
-
-
 # %%
 # --- plotting stance/swing graph
 plt.figure(figsize=(24,6))
@@ -489,6 +501,15 @@ step_df.loc[85, 'End Swing'] = np.nan
 step_df.loc[170, 'Start Swing'] = np.nan
 step_df.loc[170, 'End Swing'] = np.nan
 
+#removing the 4 outliers on both sides
+smallest_indices = step_df['Stance Duration'].nsmallest(4).index
+largest_indices = step_df['Stance Duration'].nlargest(4).index
+
+# Set these values to NaN
+step_df.loc[smallest_indices, 'Stance Duration'] = np.nan
+step_df.loc[largest_indices, 'Stance Duration'] = np.nan
+
+
 # making the last start swing nan since the data ends in a stance
 step_df.at[len(step_df) - 1, 'Start Swing'] = np.nan
 print(step_df.to_string()) #prints scrollable step df
@@ -513,18 +534,17 @@ plt.show()
 WINDOW_SIZE = .025
 #note: 180 bins (or step number) is the individual trial plots
 
-def plotting_trials(step_df, df_all, num_bins = 10, window_size = 0.025):
+def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
     # Normalize stance duration for color mapping
-    norm = Normalize(vmin=.035, vmax=.065) #selecting range of values with majority of points
+    norm = Normalize(vmin=.035, vmax=.065)  # selecting range of values with majority of points
     cmap = plt.get_cmap('plasma')
     step_df['bin'] = pd.qcut(step_df['Stance Duration'], num_bins, labels=False)
-
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
     for bin_num in range(num_bins):
-        bin_df = step_df[step_df['bin'] == bin_num] #collects rows corresponding to select bin
-        mean_data = None #stores sum of EMG data
+        bin_df = step_df[step_df['bin'] == bin_num]  # collects rows corresponding to select bin
+        mean_data = None  # stores sum of EMG data
         count = 0
 
         for idx, row in bin_df.iterrows():
@@ -532,40 +552,97 @@ def plotting_trials(step_df, df_all, num_bins = 10, window_size = 0.025):
 
             start_window = swing_onset - window_size
             end_window = swing_onset + window_size
-            
-            data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)] #gets data within time window 
-            if data_window.empty: #skips if window is empty
+
+            data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]  # gets data within time window
+            if data_window.empty:  # skips if window is empty
                 continue
-            
-            time_relative = data_window.index - swing_onset #calculates relative time to swing onset in order to overlay plots
-            
+
+            time_relative = (data_window.index - swing_onset) * 1000  # convert to milliseconds
+
             if mean_data is None:
-                mean_data = data_window['EMG']['EMG']['IL'].values #first iteration through dataframe
+                mean_data = data_window['EMG']['EMG']['VL'].values  # first iteration through dataframe
             else:
-                mean_data += data_window['EMG']['EMG']['IL'].values #continues to add data and increases count by 1
+                mean_data += data_window['EMG']['EMG']['VL'].values  # continues to add data and increases count by 1
             count += 1
-        
-        if mean_data is not None: #calculates the average within the current bin
-            mean_data /= count #dividing data by count within bin
-            color = cmap(norm(bin_df['Stance Duration'].mean())) #determines color of plotted line based on mean of values within bin
+
+        if mean_data is not None:  # calculates the average within the current bin
+            mean_data /= count  # dividing data by count within bin
+            color = cmap(norm(bin_df['Stance Duration'].mean()))  # determines color of plotted line based on mean of values within bin
             ax.plot(time_relative, mean_data, color=color, label=f'Bin {bin_num + 1}')
             ax.axvline(color='red', linestyle='--')  # vertical line at onset time
 
+    ax.set_xlim(-window_size * 1000, window_size * 1000)  # convert to milliseconds
+    ax.set_title("  Activity Across Multiple Step Cycles")
+    ax.set_xlabel('Time Relative to Swing Onset (ms)')
+    ax.set_ylabel('Rectified EMG Signal')
 
-    ax.set_xlim(-window_size, window_size)  
-    ax.set_title('Activity Across Multiple Step Cycles')
-    ax.set_xlabel('Time Relative to Swing Onset (s)')
-    ax.set_ylabel('Rectified EMG Signal') 
+    # Drop the spines on the top and right
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    sm.set_array([]) #sets array for colorbar
+    sm.set_array([])  # sets array for colorbar
     plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
 
     plt.legend()
     plt.tight_layout()
     plt.show()
 
-plotting_trials(step_df, df_all, num_bins=10, window_size=0.025) #edit bin sizes
-
+# Example usage
+plotting_trials(step_df, df_all, num_bins=20, window_size=0.025)  # edit bin sizes here
 # %%
 
+index = df_all.index
+
+# Function to check if each datapoint is stance or swing
+def check_phase(index, step_df):
+    phase = []
+
+    for t in index:
+        is_stance = False
+        is_swing = False
+        for _, row in step_df.iterrows():
+            if row['Start Stance'] <= t <= row['End Stance']:
+                is_stance = True
+                break
+            elif row['Start Swing'] <= t <= row['End Swing']:
+                is_swing = True
+                break
+        if is_stance:
+            phase.append('Stance')
+        elif is_swing:
+            phase.append('Swing')
+        else:
+            phase.append('Unknown')
+    return phase
+
+phases = check_phase(index, step_df)
+
+# Create a DataFrame to display the results
+result_df = pd.DataFrame({'Time': index, 'Phase': phases})
+print(result_df.to_string())
+
+pca = PCA(n_components=3)
+emg_pca = pca.fit_transform(df_all['EMG']['EMG'].values)
+
+# Merge the phase information back into df_all
+df_all = pd.concat([df_all, result_df], axis=1)
+
+# Now you can perform PCA and plot the results
+stance_indices = df_all[df_all['Phase'] == 'Stance'].index.to_numpy().astype(int)
+swing_indices = df_all[df_all['Phase'] == 'Swing'].index.to_numpy().astype(int)
+
+fig = plt.figure(figsize=(12, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+ax.plot(emg_pca[stance_indices, 0], emg_pca[stance_indices, 1], emg_pca[stance_indices, 2], label='Stance', color='blue')
+ax.plot(emg_pca[swing_indices, 0], emg_pca[swing_indices, 1], emg_pca[swing_indices, 2], label='Swing', color='red')
+
+ax.set_xlabel('PC1')
+ax.set_ylabel('PC2')
+ax.set_zlabel('PC3')
+ax.set_title('3D PCA Trajectory of Smoothed EMG Data')
+ax.legend()
+
+plt.show()
+# %%
