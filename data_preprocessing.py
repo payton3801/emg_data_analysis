@@ -572,7 +572,7 @@ def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
             ax.axvline(color='red', linestyle='--')  # vertical line at onset time
 
     ax.set_xlim(-window_size * 1000, window_size * 1000)  # convert to milliseconds
-    ax.set_title("  Activity Across Multiple Step Cycles")
+    ax.set_title("VL Activity Across Multiple Step Cycles")
     ax.set_xlabel('Time Relative to Swing Onset (ms)')
     ax.set_ylabel('Rectified EMG Signal')
 
@@ -590,30 +590,171 @@ def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
 
 # Example usage
 plotting_trials(step_df, df_all, num_bins=20, window_size=0.025)  # edit bin sizes here
-# %%
 
+# %% --- pca plots
+
+import pandas as pd
+import plotly.graph_objs as go
+from sklearn.decomposition import PCA
+import numpy as np
+import time
+
+index = df_all.index
+
+# Function to check if each datapoint is stance or swing using vectorized operations
+def check_phase(index, step_df):
+    phase = np.full(len(index), 'Unknown', dtype=object)
+
+    stance_start = step_df['Start Stance'].values
+    stance_end = step_df['End Stance'].values
+    swing_start = step_df['Start Swing'].values
+    swing_end = step_df['End Swing'].values
+
+    index_arr = np.array(index)
+
+    # Vectorized operations to determine stance and swing phases
+    is_stance = np.any((stance_start[:, None] <= index_arr) & (index_arr <= stance_end[:, None]), axis=0)
+    is_swing = np.any((swing_start[:, None] <= index_arr) & (index_arr <= swing_end[:, None]), axis=0)
+
+    phase[is_stance] = 'Stance'
+    phase[is_swing] = 'Swing'
+
+    return phase
+
+# Timing the phase checking
+start_time = time.time()
+phases = check_phase(index, step_df)
+end_time = time.time()
+print(f"Time taken for phase checking: {end_time - start_time} seconds")
+
+# Create a DataFrame to display the results
+start_time = time.time()
+result_df = pd.DataFrame({'Time': index, 'Phase': phases})
+print(result_df.to_string())
+end_time = time.time()
+print(f"Time taken to create result_df: {end_time - start_time} seconds")
+
+# Convert Phase column to a multi-level column before merging
+result_df.columns = pd.MultiIndex.from_tuples([('Time', ''), ('Phase', '')])
+result_df.set_index(('Time', ''), inplace=True)
+result_multi = pd.concat({('Phase', ''): result_df['Phase']}, axis=1)
+
+start_time = time.time()
+from sklearn.preprocessing import StandardScaler
+emg_data = StandardScaler().fit_transform(df_all['EMG']['EMG'].values)
+pca = PCA(n_components=3)
+emg_pca = pca.fit_transform(df_all['EMG']['EMG'].values)
+end_time = time.time()
+print(f"Time taken for PCA: {end_time - start_time} seconds")
+
+# Merge the phase information back into df_all
+start_time = time.time()
+df_all = pd.concat({
+    'EMG': pd.concat({
+        'EMG': df_emg
+    }, axis=1),
+    'Marker': pd.concat({
+        'Position': df_mk_pos,
+        'Velocity': df_mk_vel,
+        'Acceleration': df_mk_acc
+    }, axis=1),
+    'Joint': pd.concat({
+        'Position': df_joint_pos,
+        'Velocity': df_joint_vel,
+        'Acceleration': df_joint_acc
+    }, axis=1),
+    'Phase': result_multi
+}, axis=1)
+
+end_time = time.time()
+print(f"Time taken to merge phase information: {end_time - start_time} seconds")
+print(df_all)
+
+# Separate indices for stance and swing
+start_time = time.time()
+stance_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Stance')[0])
+swing_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Swing')[0])
+print(f"Time taken to separate indices: {end_time - start_time} seconds")
+
+# Plotting
+import plotly.graph_objs as go
+import time
+
+# Assuming emg_pca, stance_indices, and swing_indices are already defined
+
+# Plotting with Plotly
+start_time = time.time()
+
+trace_stance = go.Scatter3d(
+    x=emg_pca[stance_indices, 0],
+    y=emg_pca[stance_indices, 1],
+    z=emg_pca[stance_indices, 2],
+    mode='lines+markers',
+    marker=dict(size=1, color='blue'),
+    name='Stance'
+)
+
+trace_swing = go.Scatter3d(
+    x=emg_pca[swing_indices, 0],
+    y=emg_pca[swing_indices, 1],
+    z=emg_pca[swing_indices, 2],
+    mode='lines+markers',
+    marker=dict(size=1, color='red'),
+    name='Swing'
+)
+
+data = [trace_stance, trace_swing]
+layout = go.Layout(
+    title='3D PCA Trajectory of Smoothed EMG Data',
+    scene=dict(
+        xaxis=dict(title='PC1'),
+        yaxis=dict(title='PC2'),
+        zaxis=dict(title='PC3')
+    ),
+    legend=dict(title='Phase')
+)
+
+fig = go.Figure(data=data, layout=layout)
+fig.show()
+
+end_time = time.time()
+print(f"Time taken to plot: {end_time - start_time} seconds")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# %% -- replicated code to try stuff on
 index = df_all.index
 
 # Function to check if each datapoint is stance or swing
 def check_phase(index, step_df):
-    phase = []
+    phase = np.full(len(index), 'Unknown', dtype=object)
 
-    for t in index:
-        is_stance = False
-        is_swing = False
-        for _, row in step_df.iterrows():
-            if row['Start Stance'] <= t <= row['End Stance']:
-                is_stance = True
-                break
-            elif row['Start Swing'] <= t <= row['End Swing']:
-                is_swing = True
-                break
-        if is_stance:
-            phase.append('Stance')
-        elif is_swing:
-            phase.append('Swing')
-        else:
-            phase.append('Unknown')
+    stance_start = step_df['Start Stance'].values
+    stance_end = step_df['End Stance'].values
+    swing_start = step_df['Start Swing'].values
+    swing_end = step_df['End Swing'].values
+
+    index_arr = np.array(index)
+
+    # Vectorized operations to determine stance and swing phases
+    is_stance = np.any((stance_start[:, None] <= index_arr) & (index_arr <= stance_end[:, None]), axis=0)
+    is_swing = np.any((swing_start[:, None] <= index_arr) & (index_arr <= swing_end[:, None]), axis=0)
+
+    phase[is_stance] = 'Stance'
+    phase[is_swing] = 'Swing'
+
     return phase
 
 phases = check_phase(index, step_df)
@@ -622,13 +763,32 @@ phases = check_phase(index, step_df)
 result_df = pd.DataFrame({'Time': index, 'Phase': phases})
 print(result_df.to_string())
 
+
 pca = PCA(n_components=3)
 emg_pca = pca.fit_transform(df_all['EMG']['EMG'].values)
 
 # Merge the phase information back into df_all
-df_all = pd.concat([df_all, result_df], axis=1)
+df_all = pd.concat({
+    'EMG': pd.concat({
+        'EMG': df_emg #repetitive because needed all dataframes on the same level
+    }, axis=1),
+    'Marker': pd.concat({
+        'Position': df_mk_pos,
+        'Velocity': df_mk_vel,
+        'Acceleration': df_mk_acc
+    }, axis = 1),
+    'Joint': pd.concat({
+        'Position': df_joint_pos,
+        'Velocity': df_joint_vel,
+        'Acceleration': df_joint_acc
+    }, axis = 1),
+    'Phase': pd.concat({
+        'Phase': phases #repep to be able to concatenate dataframes
+    }, axis=1)
+}, axis = 1)
+print(df_all)
 
-# Now you can perform PCA and plot the results
+# %%
 stance_indices = df_all[df_all['Phase'] == 'Stance'].index.to_numpy().astype(int)
 swing_indices = df_all[df_all['Phase'] == 'Swing'].index.to_numpy().astype(int)
 
@@ -645,4 +805,3 @@ ax.set_title('3D PCA Trajectory of Smoothed EMG Data')
 ax.legend()
 
 plt.show()
-# %%
