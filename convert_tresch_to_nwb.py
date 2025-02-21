@@ -1,3 +1,4 @@
+
 from pynwb import NWBFile
 from pynwb import NWBHDF5IO
 import numpy as np
@@ -18,8 +19,12 @@ from nwb_convert.filtering import apply_notch_filt, apply_butter_filt, apply_sav
 mat_path = '/snel/share/share/data/Tresch_gaitEMG/data/J10/J10_s20_i0_pref.mat'
 save_path = '/snel/share/share/data/Tresch_gaitEMG/data/NWB/'
 
+
+# %%
 # load mat data
-f = loadmat(mat_path)
+f = loadmat('J10_s10_i0_pref.mat')
+=======
+
 
 # get file name
 file_id = f['fileName'][0].replace('_pref', '')
@@ -27,6 +32,7 @@ file_id = f['fileName'][0].replace('_pref', '')
 # get rat id
 rat_id = 'ratId'
 rat_name = f[rat_id][0]
+
 
 def convert_datestr_to_datetime(f):
     date_str = f['settings']['day'][0][0][0]
@@ -277,3 +283,4 @@ save_fname = path.join(save_path, file_id + '.nwb')
 # write processed file
 with NWBHDF5IO(save_fname, 'w') as io:
     io.write(nwbfile)
+
