@@ -1,4 +1,4 @@
-# %%
+
 from pynwb import NWBFile
 from pynwb import NWBHDF5IO
 import numpy as np
@@ -19,9 +19,12 @@ from nwb_convert.filtering import apply_notch_filt, apply_butter_filt, apply_sav
 mat_path = '/snel/share/share/data/Tresch_gaitEMG/data/J10/J10_s20_i0_pref.mat'
 save_path = '/snel/share/share/data/Tresch_gaitEMG/data/NWB/'
 
+
 # %%
 # load mat data
 f = loadmat('J10_s10_i0_pref.mat')
+=======
+
 
 # get file name
 file_id = f['fileName'][0].replace('_pref', '')
@@ -30,7 +33,7 @@ file_id = f['fileName'][0].replace('_pref', '')
 rat_id = 'ratId'
 rat_name = f[rat_id][0]
 
-# %%
+
 def convert_datestr_to_datetime(f):
     date_str = f['settings']['day'][0][0][0]
     date_str = date_str.replace('pre_','')
@@ -98,7 +101,6 @@ fo_emg_ixs = fo_emg_ixs[:n_cycles]
 # emg good channel labels
 emg_good_label = f['emg_goodCh'][0]
 
-# %%
 # === create multichannel timeseries for continuous EMG data, joint angles, and markers
 
 # -- data sample rates and timestamps
@@ -145,7 +147,6 @@ for i, jnt_name in enumerate(jnt_names):
                               timestamps=t_kin,
                               unit='deg')
 
-# %%
 
 # === NWBFile Step; create NWB file
 nwbfile = NWBFile(session_description='rat locomotion on treadmill at constant speed',
@@ -189,7 +190,7 @@ for i in range(n_cycles):
                       good_cycle=cg_label[i],
                       good_channel=emg_good_label)
 
-# %%
+
 # === data pre-processing
 
 # -- emg filtering
@@ -226,7 +227,7 @@ emg_filt.add_container(notch_emg)
 emg_filt.add_container(hp_emg)
 emg_filt.add_container(rect_emg)
 
-# %%
+
 # -- resample kinematics (joint angles and marker data)
 
 # create processing module
@@ -283,4 +284,3 @@ save_fname = path.join(save_path, file_id + '.nwb')
 with NWBHDF5IO(save_fname, 'w') as io:
     io.write(nwbfile)
 
-# %%
