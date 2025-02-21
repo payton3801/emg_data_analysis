@@ -12,6 +12,9 @@ from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
+from sklearn.preprocessing import StandardScaler
+import plotly.graph_objs as go
+
 
 
 # %% -- load mat file
@@ -176,21 +179,7 @@ for i in range(emg_filt.shape[1]):
 # --- rectifying data
 emg_rectify = np.abs(emg_filt)
 
-
-
-
-
-
-
-############################
-#working on smoothing emg here
-############################
-
-
-
-
 smooth_emg_rectify = apply_butter_filter(emg_rectify, fs = EMG_SAMPLE_RATE, cutoff_freq=10, btype="low", filt_order=4)
-
 
 # --- resampling data
 emg_resamp = apply_data_resampling(smooth_emg_rectify, upsampling=1, downsampling=10)
@@ -211,7 +200,7 @@ for i in range(num_channels):
         plt.plot(emg_clip, label= f'Clipped Data Channel {i+1}')
 
     plt.legend()
-    plt.show()
+    #plt.show()
 
 # %%
 # --- normalizing by 95th percentile
@@ -592,13 +581,6 @@ def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
 plotting_trials(step_df, df_all, num_bins=20, window_size=0.025)  # edit bin sizes here
 
 # %% --- pca plots
-
-import pandas as pd
-import plotly.graph_objs as go
-from sklearn.decomposition import PCA
-import numpy as np
-import time
-
 index = df_all.index
 
 # Function to check if each datapoint is stance or swing using vectorized operations
@@ -622,33 +604,26 @@ def check_phase(index, step_df):
     return phase
 
 # Timing the phase checking
-start_time = time.time()
 phases = check_phase(index, step_df)
-end_time = time.time()
-print(f"Time taken for phase checking: {end_time - start_time} seconds")
 
 # Create a DataFrame to display the results
-start_time = time.time()
 result_df = pd.DataFrame({'Time': index, 'Phase': phases})
-print(result_df.to_string())
-end_time = time.time()
-print(f"Time taken to create result_df: {end_time - start_time} seconds")
+#print(result_df.to_string())
 
 # Convert Phase column to a multi-level column before merging
 result_df.columns = pd.MultiIndex.from_tuples([('Time', ''), ('Phase', '')])
 result_df.set_index(('Time', ''), inplace=True)
 result_multi = pd.concat({('Phase', ''): result_df['Phase']}, axis=1)
 
-start_time = time.time()
-from sklearn.preprocessing import StandardScaler
-emg_data = StandardScaler().fit_transform(df_all['EMG']['EMG'].values)
+
+emg_data_log = np.log(np.abs(df_all['EMG']['EMG'].values)) #this is not rectified
+#emg_data_log = np.log1p(emg_data_log)
+
+emg_data_standardized = StandardScaler().fit_transform(emg_data_log)
 pca = PCA(n_components=3)
-emg_pca = pca.fit_transform(df_all['EMG']['EMG'].values)
-end_time = time.time()
-print(f"Time taken for PCA: {end_time - start_time} seconds")
+emg_pca = pca.fit_transform(emg_data_standardized)
 
 # Merge the phase information back into df_all
-start_time = time.time()
 df_all = pd.concat({
     'EMG': pd.concat({
         'EMG': df_emg
@@ -666,24 +641,13 @@ df_all = pd.concat({
     'Phase': result_multi
 }, axis=1)
 
-end_time = time.time()
-print(f"Time taken to merge phase information: {end_time - start_time} seconds")
 print(df_all)
 
 # Separate indices for stance and swing
-start_time = time.time()
 stance_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Stance')[0])
 swing_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Swing')[0])
-print(f"Time taken to separate indices: {end_time - start_time} seconds")
 
-# Plotting
-import plotly.graph_objs as go
-import time
 
-# Assuming emg_pca, stance_indices, and swing_indices are already defined
-
-# Plotting with Plotly
-start_time = time.time()
 
 trace_stance = go.Scatter3d(
     x=emg_pca[stance_indices, 0],
@@ -717,91 +681,6 @@ layout = go.Layout(
 fig = go.Figure(data=data, layout=layout)
 fig.show()
 
-end_time = time.time()
-print(f"Time taken to plot: {end_time - start_time} seconds")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# %% -- replicated code to try stuff on
-index = df_all.index
-
-# Function to check if each datapoint is stance or swing
-def check_phase(index, step_df):
-    phase = np.full(len(index), 'Unknown', dtype=object)
-
-    stance_start = step_df['Start Stance'].values
-    stance_end = step_df['End Stance'].values
-    swing_start = step_df['Start Swing'].values
-    swing_end = step_df['End Swing'].values
-
-    index_arr = np.array(index)
-
-    # Vectorized operations to determine stance and swing phases
-    is_stance = np.any((stance_start[:, None] <= index_arr) & (index_arr <= stance_end[:, None]), axis=0)
-    is_swing = np.any((swing_start[:, None] <= index_arr) & (index_arr <= swing_end[:, None]), axis=0)
-
-    phase[is_stance] = 'Stance'
-    phase[is_swing] = 'Swing'
-
-    return phase
-
-phases = check_phase(index, step_df)
-
-# Create a DataFrame to display the results
-result_df = pd.DataFrame({'Time': index, 'Phase': phases})
-print(result_df.to_string())
-
-
-pca = PCA(n_components=3)
-emg_pca = pca.fit_transform(df_all['EMG']['EMG'].values)
-
-# Merge the phase information back into df_all
-df_all = pd.concat({
-    'EMG': pd.concat({
-        'EMG': df_emg #repetitive because needed all dataframes on the same level
-    }, axis=1),
-    'Marker': pd.concat({
-        'Position': df_mk_pos,
-        'Velocity': df_mk_vel,
-        'Acceleration': df_mk_acc
-    }, axis = 1),
-    'Joint': pd.concat({
-        'Position': df_joint_pos,
-        'Velocity': df_joint_vel,
-        'Acceleration': df_joint_acc
-    }, axis = 1),
-    'Phase': pd.concat({
-        'Phase': phases #repep to be able to concatenate dataframes
-    }, axis=1)
-}, axis = 1)
-print(df_all)
 
 # %%
-stance_indices = df_all[df_all['Phase'] == 'Stance'].index.to_numpy().astype(int)
-swing_indices = df_all[df_all['Phase'] == 'Swing'].index.to_numpy().astype(int)
-
-fig = plt.figure(figsize=(12, 8))
-ax = fig.add_subplot(111, projection='3d')
-
-ax.plot(emg_pca[stance_indices, 0], emg_pca[stance_indices, 1], emg_pca[stance_indices, 2], label='Stance', color='blue')
-ax.plot(emg_pca[swing_indices, 0], emg_pca[swing_indices, 1], emg_pca[swing_indices, 2], label='Swing', color='red')
-
-ax.set_xlabel('PC1')
-ax.set_ylabel('PC2')
-ax.set_zlabel('PC3')
-ax.set_title('3D PCA Trajectory of Smoothed EMG Data')
-ax.legend()
-
-plt.show()
