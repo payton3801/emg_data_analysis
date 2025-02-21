@@ -16,8 +16,8 @@ from pynwb import ProcessingModule
 from nwb_convert.nwb_create_utils import create_multichannel_timeseries, apply_filt_to_multi_timeseries
 from nwb_convert.filtering import apply_notch_filt, apply_butter_filt, apply_savgol_diff, resample_column, rectify
 
-mat_path = '/snel/share/share/data/Tresch_gaitEMG/data/J10/J10_s20_i0_pref.mat'
-save_path = '/snel/share/share/data/Tresch_gaitEMG/data/NWB/'
+mat_path = 'J10_s20_i0_pref.mat'
+save_path = '/home/pbechef/emg_data_analysis/NWB'
 
 # %%
 # load mat data
