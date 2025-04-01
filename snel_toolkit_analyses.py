@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Define variables
 ds_base_dir = "/snel/share/share/data/Tresch_gaitEMG/data/NWB/"
-# ds_name = "J10_s20_i25"
-ds_name = "J10_s10_i0"
+ds_name = "J10_s20_i25"
+#ds_name = "J10_s10_i0"
+#ds_name = "J10_s20_i0"
 BIN_SIZE = 2  # ms
 use_cached = False  # Set this to True if you want to use cached data
 nwb_cache_dir = "/path/to/cache/dir"  # Define your cache directory
@@ -142,10 +143,14 @@ jnt_p_filt = jnt_p.apply(apply_butter_filt, args=(1000 / dataset.bin_width, "low
 jnt_v = jnt_p_filt.apply(apply_savgol_diff, args=(WINDOW_LENGTH, POLYORDER, 1, DELTA))
 jnt_a = jnt_p_filt.apply(apply_savgol_diff, args=(WINDOW_LENGTH, POLYORDER, 2, DELTA))
 
+jnt_a_40 = jnt_a.apply(apply_butter_filt, args=(1000 / dataset.bin_width, "low", 40))
+
+
 joint_names = jnt_p.columns.values.tolist()
 for joint_name in joint_names:
     dataset.data[("joint_ang_v", joint_name)] = jnt_v[joint_name]
     dataset.data[("joint_ang_a", joint_name)] = jnt_a[joint_name]
+    dataset.data[("joint_ang_a_40", joint_name)] = jnt_a_40[joint_name]
 
 # %% -- quantile clip and normalize
 dataset.data.emg_rectified = dataset.data.emg.abs()
@@ -403,7 +408,7 @@ xfields = [
     "emg_lf2",
 ]
 
-yfield = "joint_ang_a"
+yfield = "joint_ang_a_40"
 
 
 if 'clock_time' not in dw._t_df.columns:
