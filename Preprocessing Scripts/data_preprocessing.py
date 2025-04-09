@@ -15,8 +15,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objs as go
 
-
-
 # %% -- load mat file
 mat_data = loadmat('J10_s10_i0_pref.mat')
 
@@ -179,6 +177,7 @@ for i in range(emg_filt.shape[1]):
 # --- rectifying data
 emg_rectify = np.abs(emg_filt)
 
+# %%
 smooth_emg_rectify = apply_butter_filter(emg_rectify, fs = EMG_SAMPLE_RATE, cutoff_freq=10, btype="low", filt_order=4)
 
 # --- resampling data
@@ -208,7 +207,7 @@ for i in range(num_channels):
 all_clipped_data = []
 all_normalized_data = []
 
-# --- commented out plots plot the plot the overlaid normalized clipped and cliped emg as a sanity check
+# --- commented out plots plot the plot the overlaid normalized clipped and clipped emg as a sanity check
 for i in range(num_channels):
     if i == 5:
         emg_quar_chan_6 = np.quantile(emg_resamp[:, 5], 0.99)
@@ -646,7 +645,6 @@ print(df_all)
 # Separate indices for stance and swing
 stance_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Stance')[0])
 swing_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Swing')[0])
-
 
 
 trace_stance = go.Scatter3d(

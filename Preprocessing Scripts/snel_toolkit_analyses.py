@@ -29,9 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Define variables
 ds_base_dir = "/snel/share/share/data/Tresch_gaitEMG/data/NWB/"
-ds_name = "J10_s20_i25"
+#ds_name = "J10_s20_i25"
 #ds_name = "J10_s10_i0"
-#ds_name = "J10_s20_i0"
+ds_name = "J10_s20_i0" #looks similar to the paper
 BIN_SIZE = 2  # ms
 use_cached = False  # Set this to True if you want to use cached data
 nwb_cache_dir = "/path/to/cache/dir"  # Define your cache directory
