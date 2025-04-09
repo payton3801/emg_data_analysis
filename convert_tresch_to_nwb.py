@@ -19,11 +19,9 @@ from nwb_convert.filtering import apply_notch_filt, apply_butter_filt, apply_sav
 mat_path = '/snel/share/share/data/Tresch_gaitEMG/data/J10/J10_s20_i0_pref.mat'
 save_path = '/snel/share/share/data/Tresch_gaitEMG/data/NWB/'
 
-
 # %%
 # load mat data
 f = loadmat('J10_s10_i0_pref.mat')
-=======
 
 
 # get file name
