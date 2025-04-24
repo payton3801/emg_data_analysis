@@ -16,7 +16,8 @@ from sklearn.preprocessing import StandardScaler
 import plotly.graph_objs as go
 
 # %% -- load mat file
-mat_data = loadmat('J10_s10_i0_pref.mat')
+mat_data = loadmat('/home/pbechef/emg_data_analysis/Data_Files/J10_s10_i0_pref.mat')
+
 
 # %% -- load raw emg
 
@@ -679,6 +680,10 @@ layout = go.Layout(
 fig = go.Figure(data=data, layout=layout)
 fig.show()
 
+# %%
+# Save the processed data to a .pkl file
+output_file_path = "/home/pbechef/emg_data_analysis/Data_Files/preprocessed_data.pkl"  # Change the path as needed
+df_all.to_pickle(output_file_path)
 
-
+print(f"Data saved to {output_file_path}")
 # %%
