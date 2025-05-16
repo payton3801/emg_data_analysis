@@ -1,3 +1,7 @@
+####################################################################
+#This code provides utility functions for the merged_data script
+####################################################################
+
 import h5py
 import typing 
 import numpy as np
@@ -5,7 +9,8 @@ import pandas as pd
 import yaml 
 from snel_toolkit.datasets.nwb import NWBDataset
 
-# might have to delete original_h5: str, 
+
+#this function grabs the training and validation data from the original dataset
 def get_train_valid_inds(original_h5: str, torch_outputs: h5py._hl.files.File, lfads_torch_outputs_path: str) -> typing.Tuple[np.ndarray, np.ndarray]:
     original_h5_data = h5py.File(original_h5)
     train_inds = original_h5_data['train_inds'][()]
@@ -18,7 +23,7 @@ def get_train_valid_inds(original_h5: str, torch_outputs: h5py._hl.files.File, l
 
     return train_inds, valid_inds
 
-
+#this function combines training and validation into a single dataset
 def combine_train_valid_outputs(torch_outputs: h5py._hl.files.File,
                                 train_inds: np.ndarray, 
                                 valid_inds: np.ndarray,
@@ -38,10 +43,11 @@ def combine_train_valid_outputs(torch_outputs: h5py._hl.files.File,
     
     return data_dict
 
+#this function merges the original and LFADS datasets
 def merge_with_original_df(merged_df: pd.DataFrame, dataset: NWBDataset):
     for key in merged_df.columns.levels[0].to_list():
         if key == "lfads_rates":
-            chan_names = dataset.data['spikes'].columns.values
+            chan_names = dataset.data['emg'].columns.values
         else: 
             chan_names = np.arange(merged_df[key].shape[1])
         if key in dataset.data.keys():

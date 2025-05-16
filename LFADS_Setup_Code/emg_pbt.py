@@ -30,7 +30,7 @@ import sys
 PROJECT_STR = f"J10_s20_i0"
 DATASET_STR = "lfads_J10_s20_i0_emg_2"
 RUN_TAG = datetime.now().strftime("%y%m%d") + f"_J10_s20_i0_PBT"
-RUN_DIR = Path('/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_001/torch_output')# Path("/snel/share/runs") / PROJECT_STR / DATASET_STR / RUN_TAG
+RUN_DIR = Path('/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_output')# Path("/snel/share/runs") / PROJECT_STR / DATASET_STR / RUN_TAG
 HYPERPARAM_SPACE = {
     "model.lr_init": HyperParam(
         1e-10, 5e-3, explore_wt=0.3, enforce_limits=True, init=1e-3

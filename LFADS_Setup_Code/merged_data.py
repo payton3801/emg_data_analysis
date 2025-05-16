@@ -44,6 +44,7 @@ logger.addHandler(handler)
 yaml_config_path = "/home/pbechef/lfads-torch/configs/model/lfads_J10_s20_i0_emg_2.yaml"
 #path_config, ld_cfg, merge_config, _ = load_cfgs(yaml_config_path)
 
+
 # create paths -- need to check these
 ds_name = "J10_s20_i0_emg_2"
 #base_name = f"binsize_{str(bin_size)}"
@@ -53,7 +54,7 @@ run_dir = os.path.join(run_base_dir,"best_model")
 lfads_torch_outputs_path = '/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_output/best_model/lfads_output_lfads_J10_s20_i0_emg_2.h5'
 lfads_save_dir = "/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/datasets"
 #unchopped_ds_path = os.path.join(lfads_save_dir,"lfads_"+ds_name+"_unchopped.pkl")
-interface_path = "/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/datasets/pkls/J10_s10_i0_emg_2_interface.pkl"
+interface_path = "/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/datasets/pkls/J10_s20_i0_emg_2_interface.pkl"
 DATA_FILE = os.path.join(lfads_save_dir, ds_name)
 
 #og dataset
@@ -69,8 +70,6 @@ MERGE_PARAMETERS = {
     }
 
 # %% LOAD CONTINUOUS DATA DF, MERGE WITH TORCH OUTPUTS  
-
-
 
 with open(interface_path,'rb') as inf:
     interface = pkl.load(inf)
@@ -91,6 +90,14 @@ train_inds, valid_inds = get_train_valid_inds(tf2_original_h5, torch_outputs, lf
 data_dict = combine_train_valid_outputs(torch_outputs, train_inds, valid_inds, MERGE_PARAMETERS)
 merged_df = interface.merge(data_dict, smooth_pwr=1)
 
+# %%
+merge_with_original_df(merged_df, dataset)
+
+
+# %%
+#filter merged_df to only include lfads_rates, which is the channel info
+#merged_df = merged_df['lfads_rates']
+#dataset.data = merged_df
 
 # %% smooth spikes, rates, factors
 

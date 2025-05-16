@@ -86,7 +86,7 @@ with h5py.File(tf2_torch_file, 'r') as dataset:
 torch_dataset_str =  'lfads_' + ld_cfg['NAME'] + '_' + chop_cfg['TYPE'] + '_' + str(ld_cfg['BIN_SIZE']) + '.h5'
 
 kwargs = dict(dtype='float32', compression='gzip')
-output_file_path_1 = f"/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_input/{torch_dataset_str}"
+output_file_path_1 = f"/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_003/torch_input/{torch_dataset_str}"
 
 with h5py.File(output_file_path_1, 'w') as h5f:
     h5f.create_dataset('train_encod_data', data=train_encod_data, **kwargs)

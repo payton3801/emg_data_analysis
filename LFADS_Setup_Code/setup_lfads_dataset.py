@@ -168,7 +168,7 @@ current_folder = "/home/pbechef/emg_data_analysis/Data_Files/"
 DATA_FILE = os.path.join(current_folder, ds_name_pkl)
 
 with open(DATA_FILE, 'wb') as pkl_file:
-    pickle.dump(chop_df, pkl_file)
+    pickle.dump(dataset, pkl_file)
 
 print(f"Data file pickled and saved to: {DATA_FILE}")
 # %%

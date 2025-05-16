@@ -20,6 +20,7 @@ import sys
 import os
 import yaml
 import pandas as pd
+import dill
 
 # %% -- load in dataset
 
@@ -51,8 +52,13 @@ else:
 
 crit_freqs = [2, 7, 10, 20, 40] # smooth out specific frequencies
 
+lfads_path = '/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_output/best_model/lfads_J10_s20_i0_emg_2_full_merged_output.pkl'
+
+with open(lfads_path, "rb") as f:
+    lfads_data = dill.load(f)
+
 for crit_freq in crit_freqs:
-    dataset.smooth_cts(
+    lfads_data.smooth_cts(
         signal_type = 'emg',
         filt_type = 'butter',
         crit_freq = crit_freq,
@@ -62,6 +68,9 @@ for crit_freq in crit_freqs:
         overwrite = False,
         use_causal = False
     )
+
+
+
 
 # %% -- defining filtering functions
 
@@ -120,10 +129,8 @@ def apply_butter_filt(x, fs, filt_type, cutoff_freq, filt_order=4):
 
 
 # %%
-#dataset.data.modelemg
-#dataset.data.emg_lf10.plot()
-# %%
-dataset.trial_info
+dataset.data
+#dataset.trial_info
 
 # %%
 # -- update joint angle differentation
@@ -131,47 +138,50 @@ dataset.trial_info
 # savgol differentiation parameters
 WINDOW_LENGTH = 27
 POLYORDER = 5
-DELTA = dataset.bin_width / 1000
+DELTA = lfads_data.bin_width / 1000
 # == smoothing cutoff
 LF_CUTOFF = 75  # Hz
 
-jnt_p = dataset.data.joint_ang_p
+jnt_p = lfads_data.data.joint_ang_p
 # lf filter joint angles
-jnt_p_filt = jnt_p.apply(apply_butter_filt, args=(1000 / dataset.bin_width, "low", 75))
+jnt_p_filt = jnt_p.apply(apply_butter_filt, args=(1000 / lfads_data.bin_width, "low", 75))
 
 # joint differentiation
 jnt_v = jnt_p_filt.apply(apply_savgol_diff, args=(WINDOW_LENGTH, POLYORDER, 1, DELTA))
 jnt_a = jnt_p_filt.apply(apply_savgol_diff, args=(WINDOW_LENGTH, POLYORDER, 2, DELTA))
 
-jnt_a_40 = jnt_a.apply(apply_butter_filt, args=(1000 / dataset.bin_width, "low", 40))
+jnt_a_40 = jnt_a.apply(apply_butter_filt, args=(1000 / lfads_data.bin_width, "low", 40))
 
 
 joint_names = jnt_p.columns.values.tolist()
 for joint_name in joint_names:
-    dataset.data[("joint_ang_v", joint_name)] = jnt_v[joint_name]
-    dataset.data[("joint_ang_a", joint_name)] = jnt_a[joint_name]
-    dataset.data[("joint_ang_a_40", joint_name)] = jnt_a_40[joint_name]
+    lfads_data.data[("joint_ang_v", joint_name)] = jnt_v[joint_name]
+    lfads_data.data[("joint_ang_a", joint_name)] = jnt_a[joint_name]
+    lfads_data.data[("joint_ang_a_40", joint_name)] = jnt_a_40[joint_name]
 
 # %% -- quantile clip and normalize
-dataset.data.emg_rectified = dataset.data.emg.abs()
+lfads_data.data.emg_rectified = lfads_data.data.emg.abs()
 
 num_channels = 12
 
 # --- quartile clipping (channel 6 gets special attention)
 for i in range(num_channels):
     if i == 5:
-        emg_quar_chan_6 = np.quantile(dataset.data.emg_rectified.iloc[:, 5], 0.99)
-        emg_clip_chan_6 = np.clip(dataset.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
-        #plt.plot(dataset.data.emg.iloc[:, 5], label='Original Data Channel 6')
+        emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
+        emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
+        #plt.plot(lfads_data.data.emg.iloc[:, 5], label='Original Data Channel 6')
         plt.plot(emg_clip_chan_6, label='Clipped Data Channel 6')
     else:
-        emg_quar = np.quantile(dataset.data.emg_rectified.iloc[:, i], 0.999)
-        emg_clip = np.clip(dataset.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
-        #plt.plot(dataset.data.emg.iloc[:, i], label= f'Original Data Channel {i+1}')
+        emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
+        emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
+        #plt.plot(lfads_data.data.emg.iloc[:, i], label= f'Original Data Channel {i+1}')
         plt.plot(emg_clip, label= f'Clipped Data Channel {i+1}')
 
     plt.legend()
     #plt.show()
+
+# --- quantile clipping lfads data
+lfads_clipped = lfads_data.data.apply(lambda col: np.clip(col, a_min=None, a_max=np.quantile(col, 0.99)), axis=0)
 
 # %%
 # --- normalizing by 95th percentile
@@ -184,8 +194,8 @@ all_normalized_data = []
 # --- commented out plots plot the plot the overlaid normalized clipped and clipped emg as a sanity check
 for i in range(num_channels):
     if i == 5:
-        emg_quar_chan_6 = np.quantile(dataset.data.emg_rectified.iloc[:, 5], 0.99)
-        emg_clip_chan_6 = np.clip(dataset.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
+        emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
+        emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
         emg_quar_chan_6_95 = np.quantile(emg_clip_chan_6, 0.95)
         emg_normal_6 = emg_clip_chan_6 / emg_quar_chan_6_95
         print(f'Channel {i+1} 99th percentile: {emg_quar_chan_6}')
@@ -197,8 +207,8 @@ for i in range(num_channels):
         all_clipped_data.append((i+1, emg_clip_chan_6))
         all_normalized_data.append((i+1, emg_normal_6))
     else:
-        emg_quar = np.quantile(dataset.data.emg_rectified.iloc[:, i], 0.999)
-        emg_clip = np.clip(dataset.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
+        emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
+        emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
         emg_quar_95 = np.quantile(emg_clip, 0.95)
         emg_normal = emg_clip / emg_quar_95
         print(f'Channel {i+1} 99th percentile: {emg_quar}')
@@ -213,44 +223,40 @@ for i in range(num_channels):
     #plt.legend()
     #plt.show()
 
+
 # %% -- making dataframe of normalized data
 normalized_df = pd.DataFrame(
     {f"Channel_{i+1}": data for i, data in all_normalized_data}
 )
 
-# Ensure the normalized_df has the same shape as the original dataset.data.emg
-assert normalized_df.shape == dataset.data.emg.shape, "Shape mismatch between normalized data and original EMG data."
+# Ensure the normalized_df has the same shape as the original lfads_data.data.emg
+assert normalized_df.shape == lfads_data.data.emg.shape, "Shape mismatch between normalized data and original EMG data."
+
 
 # %%
 # Replace the values in the original DataFrame with the normalized values
-# Align the index of normalized_df with dataset.data.emg
-normalized_df.index = dataset.data.emg.index
-normalized_df.columns = dataset.data.emg.columns
-#dataset.data.emg.loc[:, :] = normalized_df.values
-dataset.data.emg = normalized_df.copy()
+# Align the index of normalized_df with lfads_data.data.emg
+normalized_df.index = lfads_data.data.emg.index
+normalized_df.columns = lfads_data.data.emg.columns
+#lfads_data.data.emg.loc[:, :] = normalized_df.values
+lfads_data.data.emg = normalized_df.copy()
 
 # here is where we are having problems. idk what is going on but 
 # the values keep showing up as nans in the new dataframe
 
 
-#i just ran this and it seems ok though
-
-
-
-
-
-
 
 # %% -- resample
-dataset.resample(BIN_SIZE) #should resample to 500
+lfads_data.resample(BIN_SIZE) #should resample to 500
+
 
 # %% -- absolute value EMG post-resampling
-dataset.data.emg = dataset.data.emg.abs()
+lfads_data.data.emg = lfads_data.data.emg.abs()
 
 # %% low pass filter at the end (abs value again?)
-dataset.data.emg = apply_butter_filt(dataset.data.emg , fs = 500, cutoff_freq=10, filt_type="low", filt_order=4)
+lfads_data.data.emg = apply_butter_filt(lfads_data.data.emg , fs = 500, cutoff_freq=10, filt_type="low", filt_order=4)
 
-dataset.data.emg = dataset.data.emg.abs()
+lfads_data.data.emg = lfads_data.data.emg.abs()
 
 # %% -- removing bad emg trials
 
@@ -286,7 +292,7 @@ bad_emg_trials = [
     229,
 ]
 # bad_emg_trials = []
-ti = dataset.trial_info
+ti = lfads_data.trial_info
 bad_emg = ti.trial_id == -1  # all false
 for trial_id in bad_emg_trials:
     bad_emg[ti.trial_id == trial_id] = True
@@ -295,7 +301,11 @@ bad_cycle = ti.good_cycle == 0
 
 ignore_trials = bad_cycle | bad_emg
 
-dw = DataWrangler(dataset)
+for col in lfads_data.data.columns:
+    lfads_data.data[col] = lfads_data.data[col]
+
+dw = DataWrangler(lfads_data)
+
 
 dw.make_trial_data(
     name="foot_off",
@@ -303,8 +313,6 @@ dw.make_trial_data(
     align_range=(-100, 250),
     ignored_trials=ignore_trials,
 )
-
-print(dataset.data.head())
 
 # %% -- lag decoding 
 # predict how well x-field can predict y-field at different time lags
@@ -354,6 +362,7 @@ def lag_decoding(trial_df, x_field, y_field, bin_ms, lag_steps=10, k_folds=10):
 
 # %% -- lagged decoding analysis to evaluate how well smoothed emg signals can predict joint accelerations
 
+
 """ supp fig 2b
 names = [
     "ss_deEMG_mean",
@@ -401,6 +410,7 @@ names = [
 ]
 """
 xfields = [
+    "lfads_rates",
     "emg_lf40",
     "emg_lf20",
     "emg_lf10",
@@ -433,8 +443,6 @@ x, z = np.indices(max_ix.shape)
 r2_sem_opt = r2_sem[x, max_ix, z]
 
 # %%
-# === generate bar plot
-
 group_ixs = [1, 3, 0]  # hip bot, knee, ankle
 group_spacing = 4  # spacing between groups
 n_bars = len(xfields)
@@ -460,13 +468,9 @@ deemg_colors = []
 for i in range(n_deemg):
     deemg_color = np.array((0 + (i * 10), 140, 255)) / 255
     deemg_colors.append(deemg_color)
-#bf_color = [np.array((cval_1, 90, cval_2)) / 255]
-#bf_color = [np.append(bf_color[0], 1.0)]
-#
-bar_colors = lf_colors + deemg_colors
-#bar_colors = lf_colors + deemg_colors + bf_color
-# bar_colors = deemg_colors
 
+
+bar_colors = lf_colors + deemg_colors
 bar_colors = [bar_colors] * n_groups
 bar_colors = np.concatenate(bar_colors, axis=0).tolist()
 
@@ -486,6 +490,10 @@ group_pos = np.concatenate(group_pos)
 group_r2_mean = np.concatenate(group_r2_mean)
 group_r2_sem = np.concatenate(group_r2_sem)
 
+while len(bar_colors) < len(group_pos):
+    bar_colors.extend(bar_colors)  # Repeat the colors
+bar_colors = bar_colors[:len(group_pos)]  # Trim to match the exact number of bars
+
 plt.figure(figsize=(6, 8))
 h = plt.bar(
     group_pos,
@@ -494,10 +502,36 @@ h = plt.bar(
     align="center",
     ecolor="black",
     capsize=2,
+    color="purple"  # Default color for all bars
 )
 
-for bar, color in zip(h, bar_colors):
-    bar.set_facecolor(color)
+# Modify the colors of the bars
+for i, bar in enumerate(h):
+    # Determine the group index
+    group_index = i // n_bars  # Integer division to find the group
+    if i % n_bars == 0:  # First bar of each group
+        bar.set_facecolor("#1E90FF")  # Set the first bar of each group to blue
+    else:
+        bar.set_facecolor(bar_colors[i])  # Use the existing color for other bars
+
+# Group labels
+group_labels = ["Hip", "Knee", "Ankle"]
+
+# Calculate the midpoint of each group for labeling
+group_midpoints = [np.mean(group_pos[i * n_bars:(i + 1) * n_bars]) for i in range(n_groups)]
+
+# Add group labels above the groups
+for i, label in enumerate(group_labels):
+    plt.text(
+        group_midpoints[i],  
+        0.9,                 
+        label,               
+        ha="center",         
+        va="bottom",         
+        fontsize=16,         
+        fontweight="bold"    
+    )
+
 plt.ylim((0, 0.85))
 plt.ylabel("Decoding Performance (VAF)")
 ax = plt.gca()
@@ -505,5 +539,7 @@ ax.spines["top"].set_visible(False)
 ax.spines["right"].set_visible(False)
 ax.set_xticklabels([])
 ax.set_xticks([])
+
+# %%
 
 # %%
