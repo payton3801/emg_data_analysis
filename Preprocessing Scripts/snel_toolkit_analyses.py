@@ -21,6 +21,10 @@ import os
 import yaml
 import pandas as pd
 import dill
+from snel_toolkit.analysis import PSTH
+
+
+
 
 # %% -- load in dataset
 
@@ -68,8 +72,6 @@ for crit_freq in crit_freqs:
         overwrite = False,
         use_causal = False
     )
-
-
 
 
 # %% -- defining filtering functions
@@ -135,7 +137,7 @@ dataset.data
 # %%
 # -- update joint angle differentation
 
-# savgol differentiation parameters
+# # savgol differentiation parameters
 WINDOW_LENGTH = 27
 POLYORDER = 5
 DELTA = lfads_data.bin_width / 1000
@@ -160,103 +162,103 @@ for joint_name in joint_names:
     lfads_data.data[("joint_ang_a_40", joint_name)] = jnt_a_40[joint_name]
 
 # %% -- quantile clip and normalize
-lfads_data.data.emg_rectified = lfads_data.data.emg.abs()
+# lfads_data.data.emg_rectified = lfads_data.data.emg.abs()
 
-num_channels = 12
+# num_channels = 12
 
 # --- quartile clipping (channel 6 gets special attention)
-for i in range(num_channels):
-    if i == 5:
-        emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
-        emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
-        #plt.plot(lfads_data.data.emg.iloc[:, 5], label='Original Data Channel 6')
-        plt.plot(emg_clip_chan_6, label='Clipped Data Channel 6')
-    else:
-        emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
-        emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
-        #plt.plot(lfads_data.data.emg.iloc[:, i], label= f'Original Data Channel {i+1}')
-        plt.plot(emg_clip, label= f'Clipped Data Channel {i+1}')
+# for i in range(num_channels):
+#     if i == 5:
+#         emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
+#         emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
+#         #plt.plot(lfads_data.data.emg.iloc[:, 5], label='Original Data Channel 6')
+#         plt.plot(emg_clip_chan_6, label='Clipped Data Channel 6')
+#     else:
+#         emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
+#         emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
+#         #plt.plot(lfads_data.data.emg.iloc[:, i], label= f'Original Data Channel {i+1}')
+#         plt.plot(emg_clip, label= f'Clipped Data Channel {i+1}')
 
-    plt.legend()
-    #plt.show()
+#     plt.legend()
+#     #plt.show()
 
-# --- quantile clipping lfads data
-lfads_clipped = lfads_data.data.apply(lambda col: np.clip(col, a_min=None, a_max=np.quantile(col, 0.99)), axis=0)
+# # --- quantile clipping lfads data
+# lfads_clipped = lfads_data.data.apply(lambda col: np.clip(col, a_min=None, a_max=np.quantile(col, 0.99)), axis=0)
 
 # %%
 # --- normalizing by 95th percentile
-num_channels = 12
+# num_channels = 12
 
-all_clipped_data = []
-all_normalized_data = []
+# all_clipped_data = []
+# all_normalized_data = []
 
 # %%
 # --- commented out plots plot the plot the overlaid normalized clipped and clipped emg as a sanity check
-for i in range(num_channels):
-    if i == 5:
-        emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
-        emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
-        emg_quar_chan_6_95 = np.quantile(emg_clip_chan_6, 0.95)
-        emg_normal_6 = emg_clip_chan_6 / emg_quar_chan_6_95
-        print(f'Channel {i+1} 99th percentile: {emg_quar_chan_6}')
-        print(f'Channel {i+1} 95th percentile of clipped data: {emg_quar_chan_6_95}')
-        print(f'Channel {i+1} max clipped value: {np.max(emg_clip_chan_6)}')
-        print(f'Channel {i+1} max normalized value: {np.max(emg_normal_6)}')
-        plt.plot(emg_normal_6, label=f'Normalized Data Channel {i+1}')
-        plt.plot(emg_clip_chan_6, label=f'Clipped Data Channel {i+1}')
-        all_clipped_data.append((i+1, emg_clip_chan_6))
-        all_normalized_data.append((i+1, emg_normal_6))
-    else:
-        emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
-        emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
-        emg_quar_95 = np.quantile(emg_clip, 0.95)
-        emg_normal = emg_clip / emg_quar_95
-        print(f'Channel {i+1} 99th percentile: {emg_quar}')
-        print(f'Channel {i+1} 95th percentile of clipped data: {emg_quar_95}')
-        print(f'Channel {i+1} max clipped value: {np.max(emg_clip)}')
-        print(f'Channel {i+1} max normalized value: {np.max(emg_normal)}')
-        plt.plot(emg_normal, label=f'Normalized Data Channel {i+1}')
-        plt.plot(emg_clip, label=f'Clipped Data Channel {i+1}')
-        all_clipped_data.append((i+1, emg_clip))
-        all_normalized_data.append((i+1, emg_normal))
+# for i in range(num_channels):
+#     if i == 5:
+#         emg_quar_chan_6 = np.quantile(lfads_data.data.emg_rectified.iloc[:, 5], 0.99)
+#         emg_clip_chan_6 = np.clip(lfads_data.data.emg_rectified.iloc[:, 5], a_max=emg_quar_chan_6, a_min=None)
+#         emg_quar_chan_6_95 = np.quantile(emg_clip_chan_6, 0.95)
+#         emg_normal_6 = emg_clip_chan_6 / emg_quar_chan_6_95
+#         print(f'Channel {i+1} 99th percentile: {emg_quar_chan_6}')
+#         print(f'Channel {i+1} 95th percentile of clipped data: {emg_quar_chan_6_95}')
+#         print(f'Channel {i+1} max clipped value: {np.max(emg_clip_chan_6)}')
+#         print(f'Channel {i+1} max normalized value: {np.max(emg_normal_6)}')
+#         plt.plot(emg_normal_6, label=f'Normalized Data Channel {i+1}')
+#         plt.plot(emg_clip_chan_6, label=f'Clipped Data Channel {i+1}')
+#         all_clipped_data.append((i+1, emg_clip_chan_6))
+#         all_normalized_data.append((i+1, emg_normal_6))
+#     else:
+#         emg_quar = np.quantile(lfads_data.data.emg_rectified.iloc[:, i], 0.999)
+#         emg_clip = np.clip(lfads_data.data.emg_rectified.iloc[:, i], a_max=emg_quar, a_min=None)
+#         emg_quar_95 = np.quantile(emg_clip, 0.95)
+#         emg_normal = emg_clip / emg_quar_95
+#         print(f'Channel {i+1} 99th percentile: {emg_quar}')
+#         print(f'Channel {i+1} 95th percentile of clipped data: {emg_quar_95}')
+#         print(f'Channel {i+1} max clipped value: {np.max(emg_clip)}')
+#         print(f'Channel {i+1} max normalized value: {np.max(emg_normal)}')
+#         plt.plot(emg_normal, label=f'Normalized Data Channel {i+1}')
+#         plt.plot(emg_clip, label=f'Clipped Data Channel {i+1}')
+#         all_clipped_data.append((i+1, emg_clip))
+#         all_normalized_data.append((i+1, emg_normal))
 
     #plt.legend()
     #plt.show()
 
 
 # %% -- making dataframe of normalized data
-normalized_df = pd.DataFrame(
-    {f"Channel_{i+1}": data for i, data in all_normalized_data}
-)
+# normalized_df = pd.DataFrame(
+#     {f"Channel_{i+1}": data for i, data in all_normalized_data}
+# )
 
-# Ensure the normalized_df has the same shape as the original lfads_data.data.emg
-assert normalized_df.shape == lfads_data.data.emg.shape, "Shape mismatch between normalized data and original EMG data."
-
-
-# %%
-# Replace the values in the original DataFrame with the normalized values
-# Align the index of normalized_df with lfads_data.data.emg
-normalized_df.index = lfads_data.data.emg.index
-normalized_df.columns = lfads_data.data.emg.columns
-#lfads_data.data.emg.loc[:, :] = normalized_df.values
-lfads_data.data.emg = normalized_df.copy()
-
-# here is where we are having problems. idk what is going on but 
-# the values keep showing up as nans in the new dataframe
+# # Ensure the normalized_df has the same shape as the original lfads_data.data.emg
+# assert normalized_df.shape == lfads_data.data.emg.shape, "Shape mismatch between normalized data and original EMG data."
 
 
+# # %%
+# # Replace the values in the original DataFrame with the normalized values
+# # Align the index of normalized_df with lfads_data.data.emg
+# normalized_df.index = lfads_data.data.emg.index
+# normalized_df.columns = lfads_data.data.emg.columns
+# #lfads_data.data.emg.loc[:, :] = normalized_df.values
+# lfads_data.data.emg = normalized_df.copy()
 
-# %% -- resample
-lfads_data.resample(BIN_SIZE) #should resample to 500
+# # here is where we are having problems. idk what is going on but 
+# # the values keep showing up as nans in the new dataframe
+
+
+
+# # %% -- resample
+# lfads_data.resample(BIN_SIZE) #should resample to 500
 
 
 # %% -- absolute value EMG post-resampling
-lfads_data.data.emg = lfads_data.data.emg.abs()
+# lfads_data.data.emg = lfads_data.data.emg.abs()
 
-# %% low pass filter at the end (abs value again?)
-lfads_data.data.emg = apply_butter_filt(lfads_data.data.emg , fs = 500, cutoff_freq=10, filt_type="low", filt_order=4)
+# # %% low pass filter at the end (abs value again?)
+# lfads_data.data.emg = apply_butter_filt(lfads_data.data.emg , fs = 500, cutoff_freq=10, filt_type="low", filt_order=4)
 
-lfads_data.data.emg = lfads_data.data.emg.abs()
+# lfads_data.data.emg = lfads_data.data.emg.abs()
 
 # %% -- removing bad emg trials
 
@@ -541,5 +543,156 @@ ax.set_xticklabels([])
 ax.set_xticks([])
 
 # %%
+######## making psths ###################
+channel_name = "GA"
+
+plt.figure(figsize=(10,5))
+
+dw = DataWrangler(lfads_data)
+dw.make_trial_data(
+    name="foot_off",
+    align_field="foot_off_time",  # Ensure this matches the column name in dataset.trial_info
+    align_range=(-100, 250),
+    ignored_trials=None,
+)
+
+trial_data = dw._d.trial_dfs["foot_off"]
+trial_conds = pd.Series("default", index=trial_data["trial_id"].unique())
+
+psth = PSTH(trial_conds)
+
+# Select the relevant columns
+df = trial_data[[("align_time", ""), ("trial_id", ""), ("emg", channel_name)]].copy()
+df.columns = ["align_time", "trial_id", channel_name]  # flatten locally for convenience
+
+# Group by align_time
+grouped = df.groupby("align_time")[channel_name]
+
+# Compute mean and sem
+psth_mean = grouped.mean()
+psth_sem = grouped.sem()
+
+# Plot
+plt.figure(figsize=(10,5))
+plt.plot(psth_mean.index, psth_mean.values, label="Mean")
+plt.fill_between(
+    psth_mean.index,
+    psth_mean.values - psth_sem.values,
+    psth_mean.values + psth_sem.values,
+    alpha=0.3,
+    label="SEM"
+)
+plt.axvline(0, color="red", linestyle="--", label="Foot Off")
+plt.title(f"PSTH for {channel_name}")
+plt.xlabel("Align Time")
+plt.ylabel("EMG Signal")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+
+# %%
+############################ making pcas ###########################
+
+import pandas as pd
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import plotly.graph_objects as go
+
+# Parameters
+EMG_FIELD = "emg"
+APPLY_PCA = True
+APPLY_PCA_FIELDS = [col for col in lfads_data.data.columns if col[0] == 'lfads_rates']
+NUM_PCS = 3
+
+# Extract the subset of LFADS data for PCA
+lfads_for_pca = lfads_data.data[APPLY_PCA_FIELDS]
+
+# Remove rows with NaNs
+nan_mask = lfads_for_pca.isnull().any(axis=1)
+lfads_for_pca_no_null = lfads_for_pca[~nan_mask]
+
+
+#applying pcas
+scaler = StandardScaler() #standardizes the features by removing the mean and scaling them to unit variance
+pca_model = PCA(n_components=NUM_PCS)
+pcs = pca_model.fit_transform(scaler.fit_transform(lfads_for_pca_no_null)) #standardizes the data before applying pca and applies pca
+
+#creating a df for principal components
+pcs_df = pd.DataFrame(pcs, index=lfads_for_pca_no_null.index, columns=[f"PC{i+1}" for i in range(NUM_PCS)]) #index ensures that the pcs_df has the same index as lfads_for_pca_no_null
+
+# Merge with the main df
+lfads_data.data = pd.concat([lfads_data.data, pcs_df], axis=1)
+
+#extracting foot on and off times
+foot_off_times = dataset.trial_info["foot_off_time"]  # Replace with actual column name
+foot_strike_times = dataset.trial_info["foot_strike_time"]  # Replace with actual column name
+
+#creating a df to hold stance/swing labels
+stance_swing_labels = pd.Series(index=lfads_data.data.index, dtype="object")
+
+#phases
+# for trial_id in dataset.trial_info.index:
+#     foot_off = foot_off_times[trial_id]
+#     foot_strike = foot_strike_times[trial_id]
+    
+#     stance_mask = (lfads_data.data.index >= foot_strike) & (lfads_data.data.index < foot_off)
+#     stance_swing_labels[stance_mask] = "stance"
+    
+#     swing_mask = (lfads_data.data.index >= foot_off) & (lfads_data.data.index < foot_strike)
+#     stance_swing_labels[swing_mask] = "swing"
+
+for trial_id in dataset.trial_info.index:
+    foot_off = foot_off_times[trial_id]
+    foot_strike = foot_strike_times[trial_id]
+    
+    # Get the next trial's foot_strike
+    if trial_id + 1 in dataset.trial_info.index:
+        next_foot_strike = foot_strike_times[trial_id + 1]
+    else:
+        next_foot_strike = foot_strike + pd.Timedelta(seconds=1)  # Add a fallback for the last trial
+    
+    # Define stance phase (foot strike to foot off)
+    stance_mask = (lfads_data.data.index >= foot_strike) & (lfads_data.data.index < foot_off)
+    stance_swing_labels[stance_mask] = "stance"
+    
+    # Define swing phase (foot off to next foot strike)
+    swing_mask = (lfads_data.data.index >= foot_off) & (lfads_data.data.index < next_foot_strike)
+    stance_swing_labels[swing_mask] = "swing"
+
+# Map stance/swing to colors
+color_map = {"stance": "darkorange", "swing": "black"}
+colors = stance_swing_labels.map(color_map)
+
+colors_pca = colors.loc[pcs_df.index]
+
+#plotting
+fig = go.Figure(data=[
+    go.Scatter3d(
+        x=pcs_df["PC1"],
+        y=pcs_df["PC2"],
+        z=pcs_df["PC3"],
+        mode="markers",
+        marker=dict(
+            size=3,
+            color=colors_pca.values,  # Use stance/swing colors
+            colorscale="Viridis",
+            opacity=0.8
+        )
+    )
+])
+
+fig.update_layout(
+    title="3D PCA Subspace of LFADS Rates",
+    scene=dict(
+        xaxis_title="PC1",
+        yaxis_title="PC2",
+        zaxis_title="PC3"
+    ),
+    margin=dict(l=0, r=0, b=0, t=40)
+)
+
+fig.show()
 
 # %%

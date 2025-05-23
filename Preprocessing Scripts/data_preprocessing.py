@@ -15,7 +15,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objs as go
 import dill
-from snel_toolkit.analysis import PSTH
 
 
 # %% -- load in data
@@ -815,37 +814,6 @@ with open(lfads_path, "rb") as f:
     lfads_data = dill.load(f)
 
 # %%
-trial_conds = pd.Series(
-    data=["condition1", "condition2", "condition1", "condition2"],
-    index=[1, 2, 3, 4]
-)
-
-# Example trial_data
-trial_data = pd.DataFrame({
-    "trial_id": [1, 1, 2, 2, 3, 3, 4, 4],
-    "align_time": [-100, 0, -100, 0, -100, 0, -100, 0],
-    "neural_activity": [0.5, 0.6, 0.4, 0.5, 0.7, 0.8, 0.3, 0.4]
-})
-
-# Initialize PSTH object
-psth = PSTH(trial_conds)
-
-# Compute trial averages
-field = "emg"
-conditions = ["condition1", "condition2"]
-psth_means, psth_sems = psth.compute_trial_average(trial_data, field, conditions=conditions)
-
-# Plot PSTHs
-psth.plot(
-    psth_means=psth_means,
-    psth_sems=psth_sems,
-    neurons=None,  # Plot all neurons
-    max_neurons=10,
-    max_conditions=2,
-    ncols=2,
-    cmap=plt.cm.viridis,
-    save_path=None  # Set a path to save the plot if needed
-)
 
 
 
