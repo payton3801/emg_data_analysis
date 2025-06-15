@@ -14,9 +14,19 @@ from sklearn.decomposition import PCA
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.preprocessing import StandardScaler
 import plotly.graph_objs as go
+import dill
 
-# %% -- load mat file
-mat_data = loadmat('J10_s10_i0_pref.mat')
+
+# %% -- load in data
+#mat_data = loadmat('/home/pbechef/emg_data_analysis/Data_Files/J10_s10_i0_pref.mat')
+mat_data = loadmat('/home/pbechef/emg_data_analysis/Data_Files/J10_s20_i0_pref.mat')
+
+lfads_path = '/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_output/best_model/lfads_J10_s20_i0_emg_2_full_merged_output.pkl'
+
+with open(lfads_path, "rb") as f:
+    lfads_data = dill.load(f)
+
+
 
 # %% -- load raw emg
 
@@ -356,42 +366,48 @@ df_all = pd.concat({
         'Acceleration': df_joint_acc
     }, axis = 1)
 }, axis = 1)
+
+df_all.index = pd.to_timedelta(df_all.index, unit='s')
+
 print(df_all)
 
-# note: mtp_acc has 120 nan values
 
 # %% 
 # --- defining toevelocity as a marker to differentiate between stance and swing
 toevelocity = df_all['Marker']['Velocity']['toe_y_vel']
-time = df_all.index
+time_delta = df_all.index
+
+# Convert time to numeric (e.g., seconds)
+time = (time_delta - time_delta[0]).total_seconds()
 
 # --- graphing toevelocity and mapping out stance and swing visually
-plt.figure(figsize=(12,6))
+plt.figure(figsize=(12, 6))
 peaks, _ = signal.find_peaks(toevelocity, prominence=300)
 troughs, _ = signal.find_peaks(-toevelocity, prominence=300)
 
-plt.plot (time, toevelocity, color='black')
+plt.plot(time, toevelocity, color='black')
 
-plt.scatter(time[peaks], toevelocity.iloc[peaks], label ='Peaks')
-plt.scatter(time[troughs], toevelocity.iloc[troughs], label ='Peaks')
-
+plt.scatter(time[peaks], toevelocity.iloc[peaks], label='Peaks', color='red')
+plt.scatter(time[troughs], toevelocity.iloc[troughs], label='Troughs', color='blue')
 
 plt.xlabel('Time (s)')
-plt.ylabel('Velocities') 
+plt.ylabel('Velocities')
 plt.title('Toe velocities over time')
 plt.gca().spines["top"].set_visible(False)
 plt.gca().spines["right"].set_visible(False)
 plt.axhline(y=50, color='blue', linestyle='--', linewidth=1)
 plt.axhline(y=-20, color='blue', linestyle='--', linewidth=1)
 
-#plt.ylim([-100,100])
-plt.xlim([2,3.25])
+plt.legend()
 plt.show()
 
 
 # %%
 # --- plotting stance/swing graph
-plt.figure(figsize=(24,6))
+#NOTE: adjust new points and indices to delete and neg thresh crossing according to s10 or s20
+
+plt.figure(figsize=(12, 6))
+
 mindistance = .015
 mindistance_samples = int(mindistance * EMG_SAMPLE_RATE)
 lower_mindistance = .02
@@ -401,7 +417,8 @@ peaks, _ = signal.find_peaks(toevelocity, prominence=300, distance=mindistance_s
 troughs, _ = signal.find_peaks(-toevelocity, prominence=300, distance=mindistance_samples)
 
 pos_crossing_thresh = 80
-neg_crossing_thresh = -45
+#neg_crossing_thresh = -45 this is for j10
+neg_crossing_thresh = -30 #this is for j20
 
 def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices, end_indices, min_distance, lower_min_distance, upper_min_distance, new_points=None, indices_to_delete=None):
     crossings = []
@@ -433,8 +450,14 @@ def thresh_crossings(data, time, lower_threshold, upper_threshold, start_indices
 
     return crossings
 
-new_points = [(3.461, -45), (6.024, -45), (11.302, -45)] #adding new points where algorithm got messed up
-indices_to_delete = [86, 97, 98, 176, 347] #removing points where algorithm messed up
+#new_points = [(3.461, -45), (6.024, -45), (11.302, -45)] #adding new points where algorithm got messed up, this is for j10 time
+#indices_to_delete = [86, 97, 98, 176, 347] #removing points where algorithm messed up, this is for the j10 time
+
+
+new_points = [] #adding new points where algorithm got messed up, this is for j20 time
+indices_to_delete = [] #removing points where algorithm messed up, this is for the j20 time
+
+
 crossings = thresh_crossings(toevelocity, time, neg_crossing_thresh, pos_crossing_thresh, troughs[:-1], peaks[1:], mindistance, lower_mindistance, upper_mindistance, new_points=new_points, indices_to_delete=indices_to_delete)
 
 #count upper and lower crossings
@@ -457,7 +480,7 @@ for i, (crossing_time, threshold) in enumerate(crossings):
 plt.axhline(y=neg_crossing_thresh, color='red', linestyle='--', linewidth=1, label='Lower Threshold')
 plt.axhline(y=pos_crossing_thresh, color='blue', linestyle='--', linewidth=1, label='Upper Threshold')
 
-plt.xlim([10.8,11.5])
+#plt.xlim([10,12])
 
 plt.show()
 
@@ -480,22 +503,22 @@ step_df['Swing Duration'] = step_df['End Swing'] - step_df['Start Swing']
 step_df['stance_duration_seconds'] = step_df['Stance Duration']
 
 #naning where swing is weird
-step_df.loc[42, 'Start Swing'] = np.nan
-step_df.loc[42, 'End Swing'] = np.nan
-step_df.loc[47, 'Start Swing'] = np.nan
-step_df.loc[47, 'End Swing'] = np.nan
-step_df.loc[85, 'Start Swing'] = np.nan
-step_df.loc[85, 'End Swing'] = np.nan
-step_df.loc[170, 'Start Swing'] = np.nan
-step_df.loc[170, 'End Swing'] = np.nan
+# step_df.loc[42, 'Start Swing'] = np.nan
+# step_df.loc[42, 'End Swing'] = np.nan
+# step_df.loc[47, 'Start Swing'] = np.nan
+# step_df.loc[47, 'End Swing'] = np.nan
+# step_df.loc[85, 'Start Swing'] = np.nan
+# step_df.loc[85, 'End Swing'] = np.nan
+# step_df.loc[170, 'Start Swing'] = np.nan
+# step_df.loc[170, 'End Swing'] = np.nan
 
 #removing the 4 outliers on both sides
-smallest_indices = step_df['Stance Duration'].nsmallest(4).index
-largest_indices = step_df['Stance Duration'].nlargest(4).index
+# smallest_indices = step_df['Stance Duration'].nsmallest(4).index
+# largest_indices = step_df['Stance Duration'].nlargest(4).index
 
 # Set these values to NaN
-step_df.loc[smallest_indices, 'Stance Duration'] = np.nan
-step_df.loc[largest_indices, 'Stance Duration'] = np.nan
+# step_df.loc[smallest_indices, 'Stance Duration'] = np.nan
+# step_df.loc[largest_indices, 'Stance Duration'] = np.nan
 
 
 # making the last start swing nan since the data ends in a stance
@@ -522,6 +545,66 @@ plt.show()
 WINDOW_SIZE = .025
 #note: 180 bins (or step number) is the individual trial plots
 
+#worked for j10
+# def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
+#     # Normalize stance duration for color mapping
+#     norm = Normalize(vmin=.035, vmax=.065)  # selecting range of values with majority of points
+#     cmap = plt.get_cmap('plasma')
+#     step_df['bin'] = pd.qcut(step_df['Stance Duration'], num_bins, labels=False)
+
+#     fig, ax = plt.subplots(figsize=(10, 6))
+
+#     for bin_num in range(num_bins):
+#         bin_df = step_df[step_df['bin'] == bin_num]  # collects rows corresponding to select bin
+#         mean_data = None  # stores sum of EMG data
+#         count = 0
+
+#         for idx, row in bin_df.iterrows():
+#             swing_onset = row['Start Swing']
+
+#             start_window = swing_onset - window_size
+#             end_window = swing_onset + window_size
+
+#             data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]  # gets data within time window
+#             if data_window.empty:  # skips if window is empty
+#                 continue
+
+#             time_relative = (data_window.index - swing_onset) * 1000  # convert to milliseconds
+
+#             if mean_data is None:
+#                 mean_data = data_window['EMG']['EMG']['VL'].values  # first iteration through dataframe
+#             else:
+#                 mean_data += data_window['EMG']['EMG']['VL'].values  # continues to add data and increases count by 1
+#             count += 1
+
+#         if mean_data is not None:  # calculates the average within the current bin
+#             mean_data /= count  # dividing data by count within bin
+#             color = cmap(norm(bin_df['Stance Duration'].mean()))  # determines color of plotted line based on mean of values within bin
+#             ax.plot(time_relative, mean_data, color=color, label=f'Bin {bin_num + 1}')
+#             ax.axvline(color='red', linestyle='--')  # vertical line at onset time
+
+
+#         print(f"mean_data shape: {mean_data.shape if mean_data is not None else None}")
+#         print(f"data_window shape: {data_window['EMG']['EMG']['VL'].values.shape}")
+
+#     ax.set_xlim(-window_size * 1000, window_size * 1000)  # convert to milliseconds
+#     ax.set_title("VL Activity Across Multiple Step Cycles")
+#     ax.set_xlabel('Time Relative to Swing Onset (ms)')
+#     ax.set_ylabel('Rectified EMG Signal')
+
+#     # Drop the spines on the top and right
+#     ax.spines['top'].set_visible(False)
+#     ax.spines['right'].set_visible(False)
+
+#     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+#     sm.set_array([])  # sets array for colorbar
+#     plt.colorbar(sm, ax=ax, label='Stance Duration (s)')
+
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.show()
+
+#worked for j20
 def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
     # Normalize stance duration for color mapping
     norm = Normalize(vmin=.035, vmax=.065)  # selecting range of values with majority of points
@@ -538,25 +621,29 @@ def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
         for idx, row in bin_df.iterrows():
             swing_onset = row['Start Swing']
 
-            start_window = swing_onset - window_size
-            end_window = swing_onset + window_size
+            start_window = pd.to_timedelta(swing_onset - window_size, unit='s')
+            end_window = pd.to_timedelta(swing_onset + window_size, unit='s')
 
             data_window = df_all[(df_all.index >= start_window) & (df_all.index <= end_window)]  # gets data within time window
             if data_window.empty:  # skips if window is empty
                 continue
 
-            time_relative = (data_window.index - swing_onset) * 1000  # convert to milliseconds
+            time_relative = (data_window.index - pd.to_timedelta(swing_onset, unit='s')).total_seconds() * 1000  # convert to milliseconds
 
             if mean_data is None:
-                mean_data = data_window['EMG']['EMG']['VL'].values  # first iteration through dataframe
+                mean_data = data_window['EMG']['EMG']['VL'].values
             else:
-                mean_data += data_window['EMG']['EMG']['VL'].values  # continues to add data and increases count by 1
+                # Ensure shapes match
+                min_length = min(len(mean_data), len(data_window['EMG']['EMG']['VL'].values))
+                mean_data = mean_data[:min_length]
+                data_window_values = data_window['EMG']['EMG']['VL'].values[:min_length]
+                mean_data += data_window_values
             count += 1
 
         if mean_data is not None:  # calculates the average within the current bin
             mean_data /= count  # dividing data by count within bin
             color = cmap(norm(bin_df['Stance Duration'].mean()))  # determines color of plotted line based on mean of values within bin
-            ax.plot(time_relative, mean_data, color=color, label=f'Bin {bin_num + 1}')
+            ax.plot(time_relative[:len(mean_data)], mean_data, color=color, label=f'Bin {bin_num + 1}')
             ax.axvline(color='red', linestyle='--')  # vertical line at onset time
 
     ax.set_xlim(-window_size * 1000, window_size * 1000)  # convert to milliseconds
@@ -576,7 +663,6 @@ def plotting_trials(step_df, df_all, num_bins=10, window_size=0.025):
     plt.tight_layout()
     plt.show()
 
-# Example usage
 plotting_trials(step_df, df_all, num_bins=20, window_size=0.025)  # edit bin sizes here
 
 # %% --- pca plots
@@ -586,12 +672,14 @@ index = df_all.index
 def check_phase(index, step_df):
     phase = np.full(len(index), 'Unknown', dtype=object)
 
-    stance_start = step_df['Start Stance'].values
-    stance_end = step_df['End Stance'].values
-    swing_start = step_df['Start Swing'].values
-    swing_end = step_df['End Swing'].values
+    # Convert index to Timedelta and then to numpy array
+    index_arr = pd.to_timedelta(index, unit='s').to_numpy()
 
-    index_arr = np.array(index)
+    # Convert the intervals to timedelta and then to numpy array
+    stance_start = pd.to_timedelta(step_df['Start Stance'].values, unit='s')
+    stance_end = pd.to_timedelta(step_df['End Stance'].values, unit='s')
+    swing_start = pd.to_timedelta(step_df['Start Swing'].values, unit='s')
+    swing_end = pd.to_timedelta(step_df['End Swing'].values, unit='s')
 
     # Vectorized operations to determine stance and swing phases
     is_stance = np.any((stance_start[:, None] <= index_arr) & (index_arr <= stance_end[:, None]), axis=0)
@@ -600,10 +688,27 @@ def check_phase(index, step_df):
     phase[is_stance] = 'Stance'
     phase[is_swing] = 'Swing'
 
+
+# Debugging: Check lengths of arrays
+    print(f"Length of stance_start: {len(stance_start)}")
+    print(f"Length of stance_end: {len(stance_end)}")
+    print(f"Length of swing_start: {len(swing_start)}")
+    print(f"Length of swing_end: {len(swing_end)}")
+    print(f"Length of index_arr: {len(index_arr)}")
+
+    # Debugging: Check for NaN values
+    print(f"NaN in stance_start: {np.isnan(stance_start).sum()}")
+    print(f"NaN in stance_end: {np.isnan(stance_end).sum()}")
+    print(f"NaN in swing_start: {np.isnan(swing_start).sum()}")
+    print(f"NaN in swing_end: {np.isnan(swing_end).sum()}")
+
     return phase
 
 # Timing the phase checking
 phases = check_phase(index, step_df)
+
+
+# %%
 
 # Create a DataFrame to display the results
 result_df = pd.DataFrame({'Time': index, 'Phase': phases})
@@ -615,6 +720,39 @@ result_df.set_index(('Time', ''), inplace=True)
 result_multi = pd.concat({('Phase', ''): result_df['Phase']}, axis=1)
 
 
+# Ensure all DataFrames have the same index as result_df
+result_multi = result_multi.reindex(result_df.index)  # Align Phase data to result_df index
+
+# %%
+
+common_index = df_emg.index
+
+# Function to reindex others safely --> have to use this to force the indices to align, otherwise the dataframes don't properly concatenate
+def align_index(df):
+    return df.set_index(common_index)
+
+
+df_all = pd.concat({
+    'EMG': pd.concat({
+        'EMG': align_index(df_emg)
+    }, axis=1),
+    'Marker': pd.concat({
+        'Position': align_index(df_mk_pos),
+        'Velocity': align_index(df_mk_vel),
+        'Acceleration': align_index(df_mk_acc)
+    }, axis=1),
+    'Joint': pd.concat({
+        'Position': align_index(df_joint_pos),
+        'Velocity': align_index(df_joint_vel),
+        'Acceleration': align_index(df_joint_acc)
+    }, axis=1),
+    'Phase': align_index(result_multi)
+}, axis=1)
+# df_all= pd.concat([df_all, result_df], axis=1)
+
+
+# %% ##########this si the cell that messes up the dataframe##########
+
 emg_data_log = np.log(np.abs(df_all['EMG']['EMG'].values)) #this is not rectified
 #emg_data_log = np.log1p(emg_data_log)
 
@@ -622,29 +760,14 @@ emg_data_standardized = StandardScaler().fit_transform(emg_data_log)
 pca = PCA(n_components=3)
 emg_pca = pca.fit_transform(emg_data_standardized)
 
-# Merge the phase information back into df_all
-df_all = pd.concat({
-    'EMG': pd.concat({
-        'EMG': df_emg
-    }, axis=1),
-    'Marker': pd.concat({
-        'Position': df_mk_pos,
-        'Velocity': df_mk_vel,
-        'Acceleration': df_mk_acc
-    }, axis=1),
-    'Joint': pd.concat({
-        'Position': df_joint_pos,
-        'Velocity': df_joint_vel,
-        'Acceleration': df_joint_acc
-    }, axis=1),
-    'Phase': result_multi
-}, axis=1)
-
-print(df_all)
 
 # Separate indices for stance and swing
 stance_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Stance')[0])
 swing_indices = np.array(np.where(df_all[('Phase', 'Phase')] == 'Swing')[0])
+
+# stance_indices = np.array(np.where(df_lfads[('Phase')] == 'Stance')[0])
+# swing_indices = np.array(np.where(df_lfads[('Phase')] == 'Swing')[0])
+
 
 
 trace_stance = go.Scatter3d(
@@ -679,6 +802,26 @@ layout = go.Layout(
 fig = go.Figure(data=data, layout=layout)
 fig.show()
 
+# %%
+#pca plots with lfads data
+import dill
+
+# Path to the LFADS output file
+lfads_path = '/snel/share/share/tmp/pbechef/Tresch/nwb_lfads/runs/run_002/torch_output/best_model/lfads_J10_s20_i0_emg_2_full_merged_output.pkl'
+
+# Load the LFADS data
+with open(lfads_path, "rb") as f:
+    lfads_data = dill.load(f)
+
+# %%
 
 
+
+
+# %%
+# Save the processed data to a .pkl file
+output_file_path = "/home/pbechef/emg_data_analysis/Data_Files/preprocessed_data.pkl"  # Change the path as needed
+df_all.to_pickle(output_file_path)
+
+print(f"Data saved to {output_file_path}")
 # %%
